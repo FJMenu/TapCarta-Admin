@@ -6,14 +6,12 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.1.3';
+  const APP_VERSION = 'V1.3.1.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
 <link rel="shortcut icon" type="image/png" href="./favicon.png?v=1.0.13">
 <link rel="apple-touch-icon" href="./favicon.png?v=1.0.13">
-<link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#0F0F0F">
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#0F0F0F">
 
@@ -174,8 +172,18 @@
     </div>
   </div>
 
-  <div id="join-requests-status" class="mb-3 text-sm text-cream/60">
-    Connecte-toi pour afficher les demandes.
+  <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+    <div id="join-requests-status" class="text-sm text-cream/60">
+      Connecte-toi pour afficher les demandes.
+    </div>
+
+    <button
+      id="enable-notifications-btn"
+      type="button"
+      class="hidden rounded-xl border border-gold/30 bg-gold/10 px-4 py-2 text-xs font-semibold text-gold"
+    >
+      Activer les notifications
+    </button>
   </div>
 
   <div id="join-requests-list" class="space-y-3"></div>
@@ -381,6 +389,46 @@ function updatePendingContractAlert(count) {
   document.title = TAPCARTA_ADMIN_BASE_TITLE;
 }
 
+function updateNotificationButtonVisibility() {
+  const button = document.getElementById('enable-notifications-btn');
+  if (!button) return;
+
+  if (!('Notification' in window)) {
+    button.classList.add('hidden');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    button.textContent = 'Notifications activées';
+    button.classList.remove('hidden');
+    button.disabled = true;
+    button.classList.add('opacity-60');
+    return;
+  }
+
+  button.textContent = 'Activer les notifications';
+  button.disabled = false;
+  button.classList.remove('hidden');
+  button.classList.remove('opacity-60');
+}
+
+async function requestTapCartaNotifications() {
+  if (!('Notification' in window)) {
+    alert('Notifications non supportées par ce navigateur.');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  updateNotificationButtonVisibility();
+
+  if (permission === 'granted') {
+    new Notification('TapCarta Admin', {
+      body: 'Notifications TapCarta activées.',
+      icon: './favicon.png'
+    });
+  }
+}
+
 async function initializeSaasAdmin() {
   const loginBtn = document.getElementById('admin-login-btn');
   const logoutBtn = document.getElementById('admin-logout-btn');
@@ -392,6 +440,13 @@ async function initializeSaasAdmin() {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', logoutAdmin);
   }
+
+  const notificationBtn = document.getElementById('enable-notifications-btn');
+  if (notificationBtn) {
+    notificationBtn.addEventListener('click', requestTapCartaNotifications);
+  }
+
+  updateNotificationButtonVisibility();
 
   const { data } = await tapCartaSupabase.auth.getSession();
 
