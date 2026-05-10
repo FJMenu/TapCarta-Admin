@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.2.2.6';
+  const APP_VERSION = 'V1.2.2.7';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1886,11 +1886,11 @@ function bindFormEvents() {
   });
 
   document.getElementById('save-json-btn').addEventListener('click', () => {
-    downloadCurrentRestaurantJson();
+    saveCurrentRestaurantToSupabase();
   });
 
   document.getElementById('save-json-btn-bottom').addEventListener('click', () => {
-    downloadCurrentRestaurantJson();
+    saveCurrentRestaurantToSupabase();
   });
 
   document.getElementById('menu-categories-list').addEventListener('input', (e) => {
