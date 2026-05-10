@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.1.2.1';
+  const APP_VERSION = 'V1.2.1.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -438,52 +438,116 @@ async function loadJoinRequests() {
     return;
   }
 
-  status.textContent = `${data.length} demande(s) reçue(s).`;
+  const pendingRequests = data.filter(request => request.status === 'pending_review');
+  const processedRequests = data.filter(request => request.status !== 'pending_review');
 
-  list.innerHTML = data.map(request => `
-    <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div class="text-sm font-semibold text-gold">${request.restaurant_trade_name || 'Restaurant sans nom'}</div>
-          <div class="text-sm text-cream/70">${request.contact_name || '—'} · ${request.contact_email || '—'}</div>
-          <div class="text-xs text-cream/50 mt-1">
-            ${request.city || '—'} · Offre : ${request.selected_offer || '—'} · Statut : ${request.status || '—'}
+  status.textContent = `${pendingRequests.length} à traiter · ${processedRequests.length} traitée(s).`;
+
+  const renderRequestCard = (request, isProcessed) => {
+    const offerLabel = request.selected_offer || 'standard';
+    const cityLabel = [request.city, request.country].filter(Boolean).join(' · ') || 'Localisation non indiquée';
+
+    return `
+      <div class="rounded-2xl border ${isProcessed ? 'border-emerald-400/30 bg-emerald-500/8' : 'border-gold/25 bg-black/25'} p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="text-base font-bold ${isProcessed ? 'text-emerald-300' : 'text-gold'}">
+                ${request.restaurant_trade_name || 'Restaurant sans nom'}
+              </div>
+              <span class="rounded-full border ${isProcessed ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-gold/25 bg-gold/10 text-gold'} px-3 py-1 text-xs font-semibold">
+                ${isProcessed ? 'Demande validée' : 'À traiter'}
+              </span>
+              <span class="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-cream/70">
+                Offre : ${offerLabel}
+              </span>
+            </div>
+
+            <div class="mt-2 text-sm text-cream/75">
+              ${request.contact_name || 'Contact non indiqué'} · ${request.contact_email || 'Email non indiqué'} · ${request.contact_phone || 'Téléphone non indiqué'}
+            </div>
+
+            <div class="mt-1 text-xs text-cream/50">
+              ${cityLabel} · Statut : ${request.status || '—'}
+            </div>
           </div>
+
+          ${
+            isProcessed
+              ? `
+                <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
+                  ✓ Traité
+                </div>
+              `
+              : `
+                <button
+                  type="button"
+                  data-action="validate-join-request"
+                  data-restaurant-id="${request.restaurant_id}"
+                  data-request-id="${request.id}"
+                  data-selected-offer="${offerLabel}"
+                  class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+                >
+                  Valider ${offerLabel}
+                </button>
+              `
+          }
         </div>
-
-        <button
-          type="button"
-          data-action="activate-light"
-          data-restaurant-id="${request.restaurant_id}"
-          data-request-id="${request.id}"
-          class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
-        >
-          Activer Light
-        </button>
       </div>
-    </div>
-  `).join('');
+    `;
+  };
 
-  list.querySelectorAll('[data-action="activate-light"]').forEach(button => {
+  list.innerHTML = `
+    <div class="space-y-3">
+      <div class="text-xs uppercase tracking-wide text-gold/80 font-semibold">
+        À traiter
+      </div>
+      ${
+        pendingRequests.length
+          ? pendingRequests.map(request => renderRequestCard(request, false)).join('')
+          : '<div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/55">Aucune demande en attente.</div>'
+      }
+    </div>
+
+    <div class="mt-5 space-y-3">
+      <div class="text-xs uppercase tracking-wide text-emerald-300/80 font-semibold">
+        Historique traité
+      </div>
+      ${
+        processedRequests.length
+          ? processedRequests.map(request => renderRequestCard(request, true)).join('')
+          : '<div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/55">Aucune demande traitée.</div>'
+      }
+    </div>
+  `;
+
+  list.querySelectorAll('[data-action="validate-join-request"]').forEach(button => {
     button.addEventListener('click', async () => {
-      await activateLight(button.dataset.restaurantId, button.dataset.requestId);
+      await validateJoinRequest(
+        button.dataset.restaurantId,
+        button.dataset.requestId,
+        button.dataset.selectedOffer
+      );
     });
   });
 }
 
-async function activateLight(restaurantId, requestId) {
+async function validateJoinRequest(restaurantId, requestId, selectedOffer) {
   if (!restaurantId || !requestId) return;
+
+  const offer = selectedOffer || 'standard';
 
   const { error: restaurantError } = await tapCartaSupabase
     .from('restaurants')
     .update({
       status: 'light_active',
+      pack_code: offer,
       validated_at: new Date().toISOString()
     })
     .eq('id', restaurantId);
 
   if (restaurantError) {
-    alert('Erreur activation restaurant.');
+    alert('Erreur validation restaurant.');
     console.error(restaurantError);
     return;
   }
@@ -496,7 +560,7 @@ async function activateLight(restaurantId, requestId) {
     .eq('id', requestId);
 
   if (requestError) {
-    alert('Restaurant activé, mais erreur statut demande.');
+    alert('Restaurant validé, mais erreur statut demande.');
     console.error(requestError);
     return;
   }
