@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.2.2.3';
+  const APP_VERSION = 'V1.2.2.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -676,7 +676,7 @@ function loadJoinRequestIntoAdmin(request) {
 }
 
 
-async function loadCommercialPacks() {
+async function saveCommercialPack(packId) {
   const status = document.getElementById('commercial-packs-status');
   const list = document.getElementById('commercial-packs-list');
 
