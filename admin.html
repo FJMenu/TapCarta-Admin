@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.2.2.4';
+  const APP_VERSION = 'V1.2.2.5';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -353,6 +353,7 @@ const tapCartaSupabase = supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
+let adminLanguage = 'fr';
 let commercialPacks = [];
 let restaurantsIndex = [];
 let currentRestaurantId = null;
@@ -674,9 +675,7 @@ function loadJoinRequestIntoAdmin(request) {
     behavior: 'smooth'
   });
 }
-
-
-async function saveCommercialPack(packId) {
+async function loadCommercialPacks() {
   const status = document.getElementById('commercial-packs-status');
   const list = document.getElementById('commercial-packs-list');
 
@@ -685,18 +684,41 @@ async function saveCommercialPack(packId) {
   status.textContent = 'Chargement des packs...';
   list.innerHTML = '';
 
-  const { data, error } = await tapCartaSupabase
+  const { data: packsData, error: packsError } = await tapCartaSupabase
     .from('commercial_packs')
     .select('id, code, name, status, monthly_price, currency, includes_web, includes_ordering, includes_booking, includes_reviews, included_languages, extra_language_price, display_order')
     .order('display_order', { ascending: true });
 
-  if (error) {
+  if (packsError) {
     status.textContent = 'Erreur de lecture des packs.';
-    console.error(error);
+    console.error(packsError);
     return;
   }
 
-  commercialPacks = data || [];
+  const packIds = (packsData || []).map(pack => pack.id);
+
+  const { data: translationsData, error: translationsError } = await tapCartaSupabase
+    .from('commercial_pack_translations')
+    .select('pack_id, language_code, display_name, short_description, features_text')
+    .in('pack_id', packIds)
+    .eq('language_code', adminLanguage);
+
+  if (translationsError) {
+    status.textContent = 'Erreur de lecture des traductions packs.';
+    console.error(translationsError);
+    return;
+  }
+
+  commercialPacks = (packsData || []).map(pack => {
+    const translation = (translationsData || []).find(item => item.pack_id === pack.id);
+
+    return {
+      ...pack,
+      translated_name: translation?.display_name || pack.name,
+      translated_description: translation?.short_description || '',
+      translated_features: translation?.features_text || ''
+    };
+  });
 
   renderCommercialPackSelect();
   renderCommercialPacks();
@@ -720,7 +742,7 @@ function renderCommercialPackSelect() {
 
   select.innerHTML = visiblePacks.map(pack => `
     <option value="${pack.code}" ${pack.code === previousValue ? 'selected' : ''}>
-      ${pack.name}${pack.status === 'coming_soon' ? ' — prochainement' : ''}
+      ${pack.translated_name}${pack.status === 'coming_soon' ? ' — prochainement' : ''}
     </option>
   `).join('');
 
@@ -738,7 +760,7 @@ function renderCommercialPacks() {
     <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
       <div class="mb-3 flex items-center justify-between gap-2">
         <div>
-          <div class="text-base font-bold text-gold">${pack.name}</div>
+          <div class="text-base font-bold text-gold">${pack.translated_name}</div>
           <div class="text-xs text-cream/50">${pack.code}</div>
         </div>
         <span class="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-cream/70">
