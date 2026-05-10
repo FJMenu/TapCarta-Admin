@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.2.2.8';
+  const APP_VERSION = 'V1.3.1.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -363,6 +363,19 @@ let activeUndoSource = null;
 let editMode = false;
 let isDirty = false;
 let lastSavedSnapshot = null;
+let tapCartaPendingContractCount = 0;
+const TAPCARTA_ADMIN_BASE_TITLE = 'TapCarta Admin';
+
+function updatePendingContractAlert(count) {
+  tapCartaPendingContractCount = Number(count || 0);
+
+  if (tapCartaPendingContractCount > 0) {
+    document.title = `● ${tapCartaPendingContractCount} demande(s) à traiter — ${TAPCARTA_ADMIN_BASE_TITLE}`;
+    return;
+  }
+
+  document.title = TAPCARTA_ADMIN_BASE_TITLE;
+}
 
 async function initializeSaasAdmin() {
   const loginBtn = document.getElementById('admin-login-btn');
@@ -422,6 +435,8 @@ async function logoutAdmin() {
   document.getElementById('join-requests-list').innerHTML = '';
   document.getElementById('join-requests-status').textContent =
     'Connecte-toi pour afficher les demandes.';
+
+  updatePendingContractAlert(0);
 }
 
 function showAdminSession(email) {
@@ -472,13 +487,18 @@ async function loadJoinRequests() {
 
   if (!data.length) {
     status.textContent = 'Aucune demande reçue.';
+    updatePendingContractAlert(0);
     return;
   }
 
   const pendingRequests = data.filter(request => request.status === 'pending_review');
   const processedRequests = data.filter(request => request.status !== 'pending_review');
 
-  status.textContent = `${pendingRequests.length} à traiter · ${processedRequests.length} traitée(s).`;
+  updatePendingContractAlert(pendingRequests.length);
+
+  status.innerHTML = pendingRequests.length
+    ? `<span class="inline-flex items-center rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-sm font-bold text-gold">● ${pendingRequests.length} demande(s) de contrat à traiter</span><span class="ml-2 text-cream/55">${processedRequests.length} traitée(s).</span>`
+    : `<span class="text-cream/60">0 demande à traiter · ${processedRequests.length} traitée(s).</span>`;
 
   const renderRequestCard = (request, isProcessed) => {
     const offerLabel = request.selected_offer || request.restaurants?.pack_code || 'standard';
