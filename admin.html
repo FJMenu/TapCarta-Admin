@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.1.1';
+  const APP_VERSION = 'V1.1.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -372,16 +372,25 @@ async function initializeSaasAdmin() {
 }
 
 async function loginAdmin() {
-  const email = document.getElementById('admin-email').value.trim();
-  const password = document.getElementById('admin-password').value;
+  const emailInput = document.getElementById('admin-email');
+  const passwordInput = document.getElementById('admin-password');
+
+  const email = emailInput ? emailInput.value.trim() : '';
+  const password = passwordInput ? passwordInput.value : '';
+
+  if (!email || !password) {
+    alert('Email admin et mot de passe obligatoires.');
+    console.error('Admin login missing fields:', { email, hasPassword: Boolean(password) });
+    return;
+  }
 
   const { data, error } = await tapCartaSupabase.auth.signInWithPassword({
-    email,
-    password
+    email: email,
+    password: password
   });
 
   if (error) {
-    alert('Connexion impossible.');
+    alert('Connexion impossible : ' + error.message);
     console.error(error);
     return;
   }
