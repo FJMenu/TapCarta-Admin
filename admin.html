@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.2.1.1';
+  const APP_VERSION = 'V1.2.2.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -424,7 +424,29 @@ async function loadJoinRequests() {
 
   const { data, error } = await tapCartaSupabase
     .from('join_requests')
-    .select('id, restaurant_id, contact_name, contact_email, contact_phone, restaurant_trade_name, city, country, selected_offer, status, created_at')
+    .select(`
+      id,
+      restaurant_id,
+      contact_name,
+      contact_email,
+      contact_phone,
+      restaurant_trade_name,
+      city,
+      country,
+      selected_offer,
+      status,
+      created_at,
+      restaurants (
+        id,
+        name,
+        slug,
+        status,
+        pack_code,
+        public_url,
+        resto_url,
+        validated_at
+      )
+    `)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -444,7 +466,7 @@ async function loadJoinRequests() {
   status.textContent = `${pendingRequests.length} à traiter · ${processedRequests.length} traitée(s).`;
 
   const renderRequestCard = (request, isProcessed) => {
-    const offerLabel = request.selected_offer || 'standard';
+    const offerLabel = request.selected_offer || request.restaurants?.pack_code || 'standard';
     const cityLabel = [request.city, request.country].filter(Boolean).join(' · ') || 'Localisation non indiquée';
 
     return `
@@ -472,26 +494,37 @@ async function loadJoinRequests() {
             </div>
           </div>
 
-          ${
-            isProcessed
-              ? `
-                <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
-                  ✓ Traité
-                </div>
-              `
-              : `
-                <button
-                  type="button"
-                  data-action="validate-join-request"
-                  data-restaurant-id="${request.restaurant_id}"
-                  data-request-id="${request.id}"
-                  data-selected-offer="${offerLabel}"
-                  class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
-                >
-                  Valider ${offerLabel}
-                </button>
-              `
-          }
+          <div class="flex flex-col gap-2 md:items-end">
+            <button
+              type="button"
+              data-action="load-join-request"
+              data-request-id="${request.id}"
+              class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+            >
+              Charger dans Admin
+            </button>
+
+            ${
+              isProcessed
+                ? `
+                  <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
+                    ✓ Traité
+                  </div>
+                `
+                : `
+                  <button
+                    type="button"
+                    data-action="validate-join-request"
+                    data-restaurant-id="${request.restaurant_id}"
+                    data-request-id="${request.id}"
+                    data-selected-offer="${offerLabel}"
+                    class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+                  >
+                    Valider ${offerLabel}
+                  </button>
+                `
+            }
+          </div>
         </div>
       </div>
     `;
@@ -530,6 +563,13 @@ async function loadJoinRequests() {
       );
     });
   });
+
+  list.querySelectorAll('[data-action="load-join-request"]').forEach(button => {
+    button.addEventListener('click', () => {
+      const request = data.find(item => item.id === button.dataset.requestId);
+      loadJoinRequestIntoAdmin(request);
+    });
+  });
 }
 
 async function validateJoinRequest(restaurantId, requestId, selectedOffer) {
@@ -566,6 +606,58 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer) {
   }
 
   await loadJoinRequests();
+}
+
+function loadJoinRequestIntoAdmin(request) {
+  if (!request) return;
+
+  const restaurant = request.restaurants || {};
+  const offer = request.selected_offer || restaurant.pack_code || 'standard';
+
+  currentRestaurantId = request.restaurant_id;
+
+  currentRestaurantData = normalizeRestaurantDataShape({
+    identity: {
+      id: request.restaurant_id || '',
+      name: restaurant.name || request.restaurant_trade_name || '',
+      plan: offer,
+      status: restaurant.status === 'rejected' || restaurant.status === 'suspended' ? 'inactive' : 'active',
+      languages: ['fr', 'es', 'en', 'nl']
+    },
+    status: {
+      lifecycle: restaurant.status === 'rejected' || restaurant.status === 'suspended' ? 'inactive' : 'active'
+    },
+    languages: {
+      active: ['fr', 'es', 'en', 'nl']
+    },
+    modules: {
+      web: offer !== 'light',
+      ordering: offer === 'plus' || offer === 'max',
+      booking: offer === 'plus' || offer === 'max',
+      preorderIndicative: false,
+      googleReviews: offer !== 'light',
+      whatsapp: true
+    },
+    links: {
+      publicPage: restaurant.public_url || ''
+    },
+    billing: {
+      billingStatus: restaurant.status || 'join_requested'
+    },
+    menu: {
+      categories: [],
+      menuVersion: 1,
+      updatedAt: ''
+    }
+  });
+
+  fillForm(currentRestaurantData);
+  resetDirtyState();
+
+  window.scrollTo({
+    top: document.querySelector('section.grid')?.offsetTop || 0,
+    behavior: 'smooth'
+  });
 }
 
 function formatPrice(value) {
