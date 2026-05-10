@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.2.2.1';
+  const APP_VERSION = 'V1.2.2.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -177,6 +177,19 @@
   <div id="join-requests-list" class="space-y-3"></div>
 </section>
 
+<section class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+  <div class="mb-4">
+    <h3 class="font-display text-xl font-bold text-cream">Packs commerciaux</h3>
+    <p class="text-sm text-cream/60 mt-1">Source Supabase — prix HTVA et statut des offres</p>
+  </div>
+
+  <div id="commercial-packs-status" class="mb-3 text-sm text-cream/60">
+    Connecte-toi pour charger les packs.
+  </div>
+
+  <div id="commercial-packs-list" class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"></div>
+</section>
+
         <section class="grid gap-6 xl:grid-cols-3">
           <article class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
             <div class="flex items-center gap-3 mb-5">
@@ -342,6 +355,7 @@ const tapCartaSupabase = supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
+let commercialPacks = [];
 let restaurantsIndex = [];
 let currentRestaurantId = null;
 let currentRestaurantData = null;
@@ -368,6 +382,8 @@ async function initializeSaasAdmin() {
   if (data.session) {
     showAdminSession(data.session.user.email);
     await loadJoinRequests();
+    await loadCommercialPacks();
+    await loadCommercialPacks();
   }
 }
 
@@ -397,6 +413,7 @@ async function loginAdmin() {
 
   showAdminSession(data.user.email);
   await loadJoinRequests();
+  await loadCommercialPacks();
 }
 
 async function logoutAdmin() {
@@ -658,6 +675,117 @@ function loadJoinRequestIntoAdmin(request) {
     top: document.querySelector('section.grid')?.offsetTop || 0,
     behavior: 'smooth'
   });
+}
+
+async function loadCommercialPacks() {
+  const status = document.getElementById('commercial-packs-status');
+  const list = document.getElementById('commercial-packs-list');
+
+  if (!status || !list) return;
+
+  status.textContent = 'Chargement des packs...';
+  list.innerHTML = '';
+
+  const { data, error } = await tapCartaSupabase
+    .from('commercial_packs')
+    .select('id, code, name, status, monthly_price, currency, includes_web, includes_ordering, includes_booking, includes_reviews, included_languages, extra_language_price, display_order')
+    .order('display_order', { ascending: true });
+
+  if (error) {
+    status.textContent = 'Erreur de lecture des packs.';
+    console.error(error);
+    return;
+  }
+
+  commercialPacks = data || [];
+  status.textContent = `${commercialPacks.length} pack(s) chargé(s).`;
+  renderCommercialPacks();
+}
+
+function renderCommercialPacks() {
+  const list = document.getElementById('commercial-packs-list');
+  if (!list) return;
+
+  list.innerHTML = commercialPacks.map(pack => `
+    <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div class="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <div class="text-base font-bold text-gold">${pack.name}</div>
+          <div class="text-xs text-cream/50">${pack.code}</div>
+        </div>
+        <span class="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-cream/70">
+          ${pack.status}
+        </span>
+      </div>
+
+      <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">
+        Prix mensuel HTVA
+      </label>
+      <input
+        type="number"
+        step="0.01"
+        data-pack-id="${pack.id}"
+        data-field="monthly_price"
+        value="${pack.monthly_price ?? ''}"
+        placeholder="Prix"
+        class="mb-3 w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+      >
+
+      <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">
+        Statut
+      </label>
+      <select
+        data-pack-id="${pack.id}"
+        data-field="status"
+        class="mb-3 w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+      >
+        <option value="active" ${pack.status === 'active' ? 'selected' : ''}>active</option>
+        <option value="coming_soon" ${pack.status === 'coming_soon' ? 'selected' : ''}>coming_soon</option>
+        <option value="hidden" ${pack.status === 'hidden' ? 'selected' : ''}>hidden</option>
+        <option value="archived" ${pack.status === 'archived' ? 'selected' : ''}>archived</option>
+      </select>
+
+      <button
+        type="button"
+        data-action="save-commercial-pack"
+        data-pack-id="${pack.id}"
+        class="w-full rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+      >
+        Enregistrer ce pack
+      </button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('[data-action="save-commercial-pack"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await saveCommercialPack(button.dataset.packId);
+    });
+  });
+}
+
+async function saveCommercialPack(packId) {
+  const priceInput = document.querySelector(`[data-pack-id="${packId}"][data-field="monthly_price"]`);
+  const statusInput = document.querySelector(`[data-pack-id="${packId}"][data-field="status"]`);
+
+  const rawPrice = priceInput ? priceInput.value.trim() : '';
+  const monthlyPrice = rawPrice === '' ? null : Number(rawPrice);
+  const packStatus = statusInput ? statusInput.value : 'active';
+
+  const { error } = await tapCartaSupabase
+    .from('commercial_packs')
+    .update({
+      monthly_price: monthlyPrice,
+      status: packStatus
+    })
+    .eq('id', packId);
+
+  if (error) {
+    alert('Erreur enregistrement pack.');
+    console.error(error);
+    return;
+  }
+
+  await loadCommercialPacks();
 }
 
 function formatPrice(value) {
