@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.1.5';
+  const APP_VERSION = 'V1.3.2.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -539,6 +539,8 @@ async function loadJoinRequests() {
       country,
       selected_offer,
       status,
+      email_confirmed,
+      email_confirmed_at,
       created_at,
       restaurants (
         id,
@@ -601,6 +603,22 @@ async function loadJoinRequests() {
             <div class="mt-1 text-xs text-cream/50">
               ${cityLabel} · Statut : ${request.status || '—'}
             </div>
+
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              ${
+                request.email_confirmed
+                  ? `
+                    <span class="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                      ✓ Email confirmé
+                    </span>
+                  `
+                  : `
+                    <span class="rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-300">
+                      Email non confirmé
+                    </span>
+                  `
+              }
+            </div>
           </div>
 
           <div class="flex flex-col gap-2 md:items-end">
@@ -627,6 +645,7 @@ async function loadJoinRequests() {
                     data-restaurant-id="${request.restaurant_id}"
                     data-request-id="${request.id}"
                     data-selected-offer="${offerLabel}"
+data-email-confirmed="${request.email_confirmed ? 'true' : 'false'}"
                     class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
                   >
                     Valider ${offerLabel}
@@ -668,7 +687,8 @@ async function loadJoinRequests() {
       await validateJoinRequest(
         button.dataset.restaurantId,
         button.dataset.requestId,
-        button.dataset.selectedOffer
+        button.dataset.selectedOffer,
+        button.dataset.emailConfirmed === 'true'
       );
     });
   });
@@ -681,8 +701,13 @@ async function loadJoinRequests() {
   });
 }
 
-async function validateJoinRequest(restaurantId, requestId, selectedOffer) {
+async function validateJoinRequest(restaurantId, requestId, selectedOffer, emailConfirmed) {
   if (!restaurantId || !requestId) return;
+
+  if (!emailConfirmed) {
+    alert('Validation impossible : l’email du demandeur n’a pas encore été confirmé.');
+    return;
+  }
 
   const offer = selectedOffer || 'standard';
 
