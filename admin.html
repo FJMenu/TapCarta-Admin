@@ -754,8 +754,7 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
       const activationResponse = await fetch('https://uzuejudgccpnuzqefjre.supabase.co/functions/v1/smooth-responder', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           restaurantName: request.restaurant_trade_name || request.restaurants?.name || '',
