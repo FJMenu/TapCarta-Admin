@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.2.2';
+  const APP_VERSION = 'V1.3.2.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -751,7 +751,7 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
 
   if (shouldSendActivationEmail && request) {
     try {
-      await fetch('https://uzuejudgccpnuzqefjre.supabase.co/functions/v1/smooth-responder', {
+      const activationResponse = await fetch('https://uzuejudgccpnuzqefjre.supabase.co/functions/v1/smooth-responder', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -766,9 +766,21 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
           activationLink: `https://tapcarta.com/activate.html?pack=${encodeURIComponent(offer)}`
         })
       });
+
+      const activationResult = await activationResponse.text();
+
+      if (!activationResponse.ok) {
+        console.error('Activation email failed:', activationResponse.status, activationResult);
+        alert('Demande validée, mais l’email d’activation n’a pas été envoyé. Voir console / logs Supabase.');
+        return;
+      }
+
+      console.log('Activation email sent:', activationResult);
+      alert('Demande validée. Email d’activation envoyé.');
     } catch (emailError) {
       console.error('Activation email error:', emailError);
       alert('Demande validée, mais erreur lors de l’envoi de l’email d’activation.');
+      return;
     }
   }
 
