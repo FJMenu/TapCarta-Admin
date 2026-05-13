@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.2.3';
+  const APP_VERSION = 'V1.3.2.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -751,10 +751,19 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
 
   if (shouldSendActivationEmail && request) {
     try {
+      const { data: sessionData } = await tapCartaSupabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (!accessToken) {
+        alert('Session admin introuvable. Déconnecte-toi puis reconnecte-toi avant de valider.');
+        return;
+      }
+
       const activationResponse = await fetch('https://uzuejudgccpnuzqefjre.supabase.co/functions/v1/smooth-responder', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify({
           restaurantName: request.restaurant_trade_name || request.restaurants?.name || '',
