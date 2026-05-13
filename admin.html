@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.2.1';
+  const APP_VERSION = 'V1.3.2.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -537,6 +537,7 @@ async function loadJoinRequests() {
       restaurant_trade_name,
       city,
       country,
+      preferred_language,
       selected_offer,
       status,
       email_confirmed,
@@ -684,11 +685,14 @@ data-email-confirmed="${request.email_confirmed ? 'true' : 'false'}"
 
   list.querySelectorAll('[data-action="validate-join-request"]').forEach(button => {
     button.addEventListener('click', async () => {
+      const request = data.find(item => item.id === button.dataset.requestId);
+
       await validateJoinRequest(
         button.dataset.restaurantId,
         button.dataset.requestId,
         button.dataset.selectedOffer,
-        button.dataset.emailConfirmed === 'true'
+        button.dataset.emailConfirmed === 'true',
+        request
       );
     });
   });
@@ -700,8 +704,7 @@ data-email-confirmed="${request.email_confirmed ? 'true' : 'false'}"
     });
   });
 }
-
-async function validateJoinRequest(restaurantId, requestId, selectedOffer, emailConfirmed) {
+async function validateJoinRequest(restaurantId, requestId, selectedOffer, emailConfirmed, request) {
   if (!restaurantId || !requestId) return;
 
   if (!emailConfirmed) {
@@ -742,6 +745,31 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
     alert('Restaurant validé, mais erreur statut demande.');
     console.error(requestError);
     return;
+  }
+
+  const shouldSendActivationEmail = offer === 'standard' || offer === 'plus';
+
+  if (shouldSendActivationEmail && request) {
+    try {
+      await fetch('https://uzuejudgccpnuzqefjre.supabase.co/functions/v1/smooth-responder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          restaurantName: request.restaurant_trade_name || request.restaurants?.name || '',
+          contactName: request.contact_name || '',
+          contactEmail: request.contact_email || '',
+          preferredLanguage: request.preferred_language || 'fr',
+          selectedOffer: offer,
+          activationLink: `https://tapcarta.com/activate.html?pack=${encodeURIComponent(offer)}`
+        })
+      });
+    } catch (emailError) {
+      console.error('Activation email error:', emailError);
+      alert('Demande validée, mais erreur lors de l’envoi de l’email d’activation.');
+    }
   }
 
   await loadJoinRequests();
