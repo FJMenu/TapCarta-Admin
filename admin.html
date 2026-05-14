@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.1';
+  const APP_VERSION = 'V1.3.3.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -241,12 +241,25 @@
 </div>
 
 <div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Slug public</label>
+  <input
+    id="field-slug"
+    type="text"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+    placeholder="la-sarten-manilva"
+  >
+  <p class="mt-2 text-xs text-cream/45">
+    Utilisé pour l’URL publique et le futur QR.
+  </p>
+</div>
+
+<div>
   <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">URL publique client</label>
   <input
     id="field-public-page"
     type="text"
     class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
-    placeholder="https://tapcarta.com/nomduresto/"
+    placeholder="https://tapcarta.com/la-sarten-manilva/"
   >
 </div>
             </div>
@@ -886,7 +899,8 @@ function loadJoinRequestIntoAdmin(request) {
       whatsapp: true
     },
     links: {
-      publicPage: restaurant.public_url || ''
+      slug: restaurant.slug || '',
+      publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || '')
     },
     billing: {
       billingStatus: restaurant.status || 'join_requested'
@@ -1073,6 +1087,23 @@ function formatPrice(value) {
   return `${value} € / mois HTVA`;
 }
 
+function normalizeTapCartaSlug(value) {
+  return (value || '')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 64);
+}
+
+function buildTapCartaPublicUrl(slug) {
+  const cleanSlug = normalizeTapCartaSlug(slug);
+  return cleanSlug ? `https://tapcarta.com/${cleanSlug}/` : '';
+}
+
 function normalizeRestaurantDataShape(data) {
   if (!data || typeof data !== 'object') {
     data = {};
@@ -1221,6 +1252,10 @@ function normalizeRestaurantDataShape(data) {
   data.status.lifecycle = normalizedStatus;
   data.identity.status = normalizedStatus;
 
+  if (typeof data.links.slug !== 'string') {
+    data.links.slug = '';
+  }
+
   if (typeof data.links.publicPage !== 'string') {
     data.links.publicPage =
       typeof data.links.clientMenuUrl === 'string'
@@ -1350,6 +1385,7 @@ function applyEditMode() {
     document.getElementById('field-status'),
     document.getElementById('field-plan'),
     document.getElementById('field-languages'),
+    document.getElementById('field-slug'),
     document.getElementById('field-public-page')
   ];
 
@@ -1855,6 +1891,7 @@ function recalculateBilling() {
       document.getElementById('field-status').value = lifecycleStatus;
       document.getElementById('field-plan').value = data.identity.plan || 'standard';
       document.getElementById('field-languages').value = activeLanguages.join(', ');
+      document.getElementById('field-slug').value = data.links?.slug || '';
       document.getElementById('field-public-page').value =
         data.links?.publicPage ||
         data.links?.clientMenuUrl ||
@@ -1881,7 +1918,8 @@ function recalculateBilling() {
 
   const restaurantName = currentRestaurantData.identity?.name || '';
   const packCode = currentRestaurantData.identity?.plan || 'standard';
-  const publicUrl = currentRestaurantData.links?.publicPage || '';
+  const restaurantSlug = normalizeTapCartaSlug(currentRestaurantData.links?.slug || '');
+  const publicUrl = currentRestaurantData.links?.publicPage || buildTapCartaPublicUrl(restaurantSlug);
 
   const activeLanguages = Array.isArray(currentRestaurantData.languages?.active)
     ? currentRestaurantData.languages.active
@@ -1893,6 +1931,7 @@ function recalculateBilling() {
     .from('restaurants')
     .update({
       name: restaurantName,
+      slug: restaurantSlug,
       pack_code: packCode,
       public_url: publicUrl,
       updated_at: new Date().toISOString()
@@ -2081,6 +2120,23 @@ function bindFormEvents() {
     document.getElementById('billing-options-price').textContent =
       `${(currentRestaurantData.billing.orderingBookingOption || 0) + (currentRestaurantData.billing.extraLanguages || 0) + (currentRestaurantData.billing.webOption || 0)} € / mois`;
     document.getElementById('billing-total').textContent = formatPrice(currentRestaurantData.billing.monthlyTotal || 0);
+    markDirty();
+  });
+
+  document.getElementById('field-slug').addEventListener('input', (e) => {
+    if (!currentRestaurantData) return;
+
+    if (!currentRestaurantData.links) {
+      currentRestaurantData.links = {};
+    }
+
+    const normalizedSlug = normalizeTapCartaSlug(e.target.value);
+    currentRestaurantData.links.slug = normalizedSlug;
+    currentRestaurantData.links.publicPage = buildTapCartaPublicUrl(normalizedSlug);
+
+    e.target.value = normalizedSlug;
+    document.getElementById('field-public-page').value = currentRestaurantData.links.publicPage;
+
     markDirty();
   });
 
