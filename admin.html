@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.4';
+  const APP_VERSION = 'V1.3.3.5';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -516,6 +516,9 @@ let lastSavedSnapshot = null;
 let tapCartaPendingContractCount = 0;
 const TAPCARTA_ADMIN_BASE_TITLE = 'TapCarta Admin';
 let tapCartaLastKnownPendingCount = null;
+let tapCartaJoinRequestsRefreshTimer = null;
+let tapCartaKnownConfirmedRequests = new Set();
+let tapCartaIsRefreshingJoinRequests = false;
 
 function updatePendingContractAlert(count) {
   const previousCount = tapCartaLastKnownPendingCount;
@@ -649,6 +652,8 @@ async function logoutAdmin() {
     'Connecte-toi pour afficher les demandes.';
 
   updatePendingContractAlert(0);
+  updateJoinRequestsAutoRefresh(0);
+  tapCartaKnownConfirmedRequests.clear();
 }
 
 function showAdminSession(email) {
@@ -656,7 +661,33 @@ function showAdminSession(email) {
   document.getElementById('admin-session-box').classList.remove('hidden');
   document.getElementById('admin-session-email').textContent = email;
 }
+function updateJoinRequestsAutoRefresh(pendingCount) {
+  if (pendingCount > 0) {
+    if (!tapCartaJoinRequestsRefreshTimer) {
+      tapCartaJoinRequestsRefreshTimer = setInterval(async () => {
+        if (tapCartaIsRefreshingJoinRequests) return;
 
+        // Sécurité : ne pas rafraîchir pendant une modification en cours
+        if (editMode || isDirty) return;
+
+        tapCartaIsRefreshingJoinRequests = true;
+
+        try {
+          await loadJoinRequests();
+        } finally {
+          tapCartaIsRefreshingJoinRequests = false;
+        }
+      }, 45000);
+    }
+
+    return;
+  }
+
+  if (tapCartaJoinRequestsRefreshTimer) {
+    clearInterval(tapCartaJoinRequestsRefreshTimer);
+    tapCartaJoinRequestsRefreshTimer = null;
+  }
+}
 async function loadJoinRequests() {
   const status = document.getElementById('join-requests-status');
   const list = document.getElementById('join-requests-list');
@@ -719,7 +750,23 @@ async function loadJoinRequests() {
   const pendingRequests = data.filter(request => request.status === 'pending_review');
   const processedRequests = data.filter(request => request.status !== 'pending_review');
 
+  const confirmedPendingRequests = pendingRequests.filter(request => request.email_confirmed);
+
+  confirmedPendingRequests.forEach((request) => {
+    if (!tapCartaKnownConfirmedRequests.has(request.id)) {
+      tapCartaKnownConfirmedRequests.add(request.id);
+
+      if (Notification.permission === 'granted') {
+        new Notification('TapCarta Admin', {
+          body: `Email confirmé : ${request.restaurant_trade_name || 'nouvelle demande'}`,
+          icon: './favicon.png'
+        });
+      }
+    }
+  });
+
   updatePendingContractAlert(pendingRequests.length);
+  updateJoinRequestsAutoRefresh(pendingRequests.length);
 
   status.innerHTML = pendingRequests.length
     ? `<span class="inline-flex items-center rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-sm font-bold text-gold">● ${pendingRequests.length} demande(s) de contrat à traiter</span><span class="ml-2 text-cream/55">${processedRequests.length} traitée(s).</span>`
