@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.2';
+  const APP_VERSION = 'V1.3.3.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -312,6 +312,104 @@
               </div>
             </div>
           </article>
+</section>
+
+<section class="mt-6">
+  <article class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-10 h-10 rounded-2xl bg-gold/12 border border-gold/25 flex items-center justify-center">
+        <i data-lucide="clipboard-check" class="w-5 h-5 text-gold"></i>
+      </div>
+      <div>
+        <h3 class="font-display text-lg font-bold text-cream">Onboarding / éléments client</h3>
+        <p class="text-xs text-cream/60 mt-1">Suivi interne des éléments reçus ou manquants</p>
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Logo</label>
+        <select id="onboarding-logo-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="missing">Manquant</option>
+          <option value="received">Reçu</option>
+          <option value="validated">Validé</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Menu</label>
+        <select id="onboarding-menu-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="missing">Manquant</option>
+          <option value="received">Reçu</option>
+          <option value="validated">Validé</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Traduction</label>
+        <select id="onboarding-translations-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="missing">Manquant / non traité</option>
+          <option value="requested">Demandée</option>
+          <option value="payment_sent">Paiement envoyé</option>
+          <option value="paid">Payée</option>
+          <option value="done">Terminée</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Infos légales</label>
+        <select id="onboarding-legal-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="missing">Manquant</option>
+          <option value="received">Reçu</option>
+          <option value="complete">Complet</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">GoCardless</label>
+        <select id="onboarding-gocardless-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="not_started">Non commencé</option>
+          <option value="pending">En attente</option>
+          <option value="validated">Validé</option>
+        </select>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-black/15 px-4 py-3">
+        <label class="flex items-center justify-between gap-3 text-sm text-cream">
+          <span>Traduction demandée</span>
+          <input id="onboarding-translation-requested" type="checkbox" class="w-4 h-4 accent-yellow-400">
+        </label>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Frais traduction HTVA</label>
+        <input
+          id="onboarding-translation-fee"
+          type="number"
+          step="0.01"
+          class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+          placeholder="30"
+        >
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Statut rapide</label>
+        <div id="onboarding-summary" class="rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold">
+          —
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Notes internes</label>
+      <textarea
+        id="onboarding-notes"
+        rows="3"
+        class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+        placeholder="Exemple : menu reçu mais horaires manquants, demander confirmation des langues..."
+      ></textarea>
+    </div>
+  </article>
 </section>
 
         <section class="mt-6">
@@ -867,7 +965,7 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
   await loadJoinRequests();
 }
 
-function loadJoinRequestIntoAdmin(request) {
+async function loadJoinRequestIntoAdmin(request) {
   if (!request) return;
 
   const restaurant = request.restaurants || {};
@@ -875,6 +973,32 @@ function loadJoinRequestIntoAdmin(request) {
   const pack = getCommercialPackByCode(offer);
 
   currentRestaurantId = request.restaurant_id;
+
+  let onboardingData = null;
+
+  if (currentRestaurantId) {
+    const { data: onboardingResult, error: onboardingError } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .select(`
+        id,
+        logo_status,
+        menu_status,
+        translations_status,
+        legal_info_status,
+        gocardless_status,
+        translation_service_requested,
+        translation_fee,
+        notes
+      `)
+      .eq('restaurant_id', currentRestaurantId)
+      .maybeSingle();
+
+    if (onboardingError) {
+      console.error('Erreur lecture onboarding_assets:', onboardingError);
+    }
+
+    onboardingData = onboardingResult || null;
+  }
 
   currentRestaurantData = normalizeRestaurantDataShape({
     identity: {
@@ -905,6 +1029,7 @@ function loadJoinRequestIntoAdmin(request) {
     billing: {
       billingStatus: restaurant.status || 'join_requested'
     },
+    onboarding: onboardingData || {},
     menu: {
       categories: [],
       menuVersion: 1,
@@ -1136,6 +1261,22 @@ function normalizeRestaurantDataShape(data) {
   if (!data.languages || typeof data.languages !== 'object') {
     data.languages = {};
   }
+
+  if (!data.onboarding || typeof data.onboarding !== 'object') {
+    data.onboarding = {};
+  }
+
+  data.onboarding = {
+    id: data.onboarding.id || '',
+    logo_status: data.onboarding.logo_status || 'missing',
+    menu_status: data.onboarding.menu_status || 'missing',
+    translations_status: data.onboarding.translations_status || 'missing',
+    legal_info_status: data.onboarding.legal_info_status || 'missing',
+    gocardless_status: data.onboarding.gocardless_status || 'not_started',
+    translation_service_requested: Boolean(data.onboarding.translation_service_requested),
+    translation_fee: Number(data.onboarding.translation_fee || 0),
+    notes: data.onboarding.notes || ''
+  };
 
   data.modules = {
     web: Boolean(data.modules.web),
@@ -1386,7 +1527,15 @@ function applyEditMode() {
     document.getElementById('field-plan'),
     document.getElementById('field-languages'),
     document.getElementById('field-slug'),
-    document.getElementById('field-public-page')
+    document.getElementById('field-public-page'),
+    document.getElementById('onboarding-logo-status'),
+    document.getElementById('onboarding-menu-status'),
+    document.getElementById('onboarding-translations-status'),
+    document.getElementById('onboarding-legal-status'),
+    document.getElementById('onboarding-gocardless-status'),
+    document.getElementById('onboarding-translation-requested'),
+    document.getElementById('onboarding-translation-fee'),
+    document.getElementById('onboarding-notes')
   ];
 
   editableFields.forEach((field) => {
@@ -1908,6 +2057,28 @@ function recalculateBilling() {
       document.getElementById('billing-total').textContent = formatPrice(data.billing.monthlyTotal || 0);
       document.getElementById('billing-status').textContent = data.billing.billingStatus || '—';
 
+      document.getElementById('onboarding-logo-status').value = data.onboarding.logo_status || 'missing';
+      document.getElementById('onboarding-menu-status').value = data.onboarding.menu_status || 'missing';
+      document.getElementById('onboarding-translations-status').value = data.onboarding.translations_status || 'missing';
+      document.getElementById('onboarding-legal-status').value = data.onboarding.legal_info_status || 'missing';
+      document.getElementById('onboarding-gocardless-status').value = data.onboarding.gocardless_status || 'not_started';
+      document.getElementById('onboarding-translation-requested').checked = Boolean(data.onboarding.translation_service_requested);
+      document.getElementById('onboarding-translation-fee').value = Number(data.onboarding.translation_fee || 0);
+      document.getElementById('onboarding-notes').value = data.onboarding.notes || '';
+
+      const onboardingSummary = document.getElementById('onboarding-summary');
+      if (onboardingSummary) {
+        const missingItems = [
+          data.onboarding.menu_status === 'missing' ? 'menu' : '',
+          data.onboarding.legal_info_status === 'missing' ? 'infos légales' : '',
+          data.onboarding.gocardless_status !== 'validated' ? 'GoCardless' : ''
+        ].filter(Boolean);
+
+        onboardingSummary.textContent = missingItems.length
+          ? `Manque : ${missingItems.join(', ')}`
+          : 'Dossier prêt';
+      }
+
       if (window.lucide) lucide.createIcons();
     }
     async function saveCurrentRestaurantToSupabase() {
@@ -1958,6 +2129,51 @@ function recalculateBilling() {
   if (settingsError) {
     alert('Restaurant sauvegardé, mais erreur paramètres.');
     console.error(settingsError);
+    return;
+  }
+
+  const onboarding = currentRestaurantData.onboarding || {};
+
+  const onboardingPayload = {
+    restaurant_id: currentRestaurantId,
+    logo_status: onboarding.logo_status || 'missing',
+    menu_status: onboarding.menu_status || 'missing',
+    translations_status: onboarding.translations_status || 'missing',
+    photos_status: 'missing',
+    legal_info_status: onboarding.legal_info_status || 'missing',
+    gocardless_status: onboarding.gocardless_status || 'not_started',
+    translation_service_requested: Boolean(onboarding.translation_service_requested),
+    translation_fee: Number(onboarding.translation_fee || 0),
+    notes: onboarding.notes || '',
+    updated_at: new Date().toISOString()
+  };
+
+  let onboardingError = null;
+
+  if (onboarding.id) {
+    const { error } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .update(onboardingPayload)
+      .eq('id', onboarding.id);
+
+    onboardingError = error;
+  } else {
+    const { data: insertedOnboarding, error } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .insert(onboardingPayload)
+      .select('id')
+      .single();
+
+    onboardingError = error;
+
+    if (insertedOnboarding?.id) {
+      currentRestaurantData.onboarding.id = insertedOnboarding.id;
+    }
+  }
+
+  if (onboardingError) {
+    alert('Restaurant sauvegardé, mais erreur onboarding.');
+    console.error(onboardingError);
     return;
   }
 
@@ -2150,6 +2366,38 @@ function bindFormEvents() {
     currentRestaurantData.links.publicPage = e.target.value.trim();
     markDirty();
   });
+
+  const bindOnboardingField = (fieldId, key, type = 'value') => {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+
+    field.addEventListener(type === 'checkbox' ? 'change' : 'input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.onboarding || typeof currentRestaurantData.onboarding !== 'object') {
+        currentRestaurantData.onboarding = {};
+      }
+
+      if (type === 'checkbox') {
+        currentRestaurantData.onboarding[key] = e.target.checked;
+      } else if (type === 'number') {
+        currentRestaurantData.onboarding[key] = Number(e.target.value || 0);
+      } else {
+        currentRestaurantData.onboarding[key] = e.target.value;
+      }
+
+      markDirty();
+    });
+  };
+
+  bindOnboardingField('onboarding-logo-status', 'logo_status');
+  bindOnboardingField('onboarding-menu-status', 'menu_status');
+  bindOnboardingField('onboarding-translations-status', 'translations_status');
+  bindOnboardingField('onboarding-legal-status', 'legal_info_status');
+  bindOnboardingField('onboarding-gocardless-status', 'gocardless_status');
+  bindOnboardingField('onboarding-translation-requested', 'translation_service_requested', 'checkbox');
+  bindOnboardingField('onboarding-translation-fee', 'translation_fee', 'number');
+  bindOnboardingField('onboarding-notes', 'notes');
 
   document.getElementById('modules-list').addEventListener('change', (e) => {
     if (!currentRestaurantData) return;
