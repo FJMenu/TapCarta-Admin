@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.5';
+  const APP_VERSION = 'V1.3.3.6';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -652,7 +652,7 @@ async function logoutAdmin() {
     'Connecte-toi pour afficher les demandes.';
 
   updatePendingContractAlert(0);
-  updateJoinRequestsAutoRefresh(0);
+  stopJoinRequestsAutoRefresh();
   tapCartaKnownConfirmedRequests.clear();
 }
 
@@ -660,29 +660,29 @@ function showAdminSession(email) {
   document.getElementById('admin-auth-box').classList.add('hidden');
   document.getElementById('admin-session-box').classList.remove('hidden');
   document.getElementById('admin-session-email').textContent = email;
+
+  updateJoinRequestsAutoRefresh();
 }
-function updateJoinRequestsAutoRefresh(pendingCount) {
-  if (pendingCount > 0) {
-    if (!tapCartaJoinRequestsRefreshTimer) {
-      tapCartaJoinRequestsRefreshTimer = setInterval(async () => {
-        if (tapCartaIsRefreshingJoinRequests) return;
+function updateJoinRequestsAutoRefresh() {
+  if (tapCartaJoinRequestsRefreshTimer) return;
 
-        // Sécurité : ne pas rafraîchir pendant une modification en cours
-        if (editMode || isDirty) return;
+  tapCartaJoinRequestsRefreshTimer = setInterval(async () => {
+    if (tapCartaIsRefreshingJoinRequests) return;
 
-        tapCartaIsRefreshingJoinRequests = true;
+    // Sécurité : ne pas rafraîchir pendant une modification en cours
+    if (editMode || isDirty) return;
 
-        try {
-          await loadJoinRequests();
-        } finally {
-          tapCartaIsRefreshingJoinRequests = false;
-        }
-      }, 45000);
+    tapCartaIsRefreshingJoinRequests = true;
+
+    try {
+      await loadJoinRequests();
+    } finally {
+      tapCartaIsRefreshingJoinRequests = false;
     }
+  }, 45000);
+}
 
-    return;
-  }
-
+function stopJoinRequestsAutoRefresh() {
   if (tapCartaJoinRequestsRefreshTimer) {
     clearInterval(tapCartaJoinRequestsRefreshTimer);
     tapCartaJoinRequestsRefreshTimer = null;
