@@ -978,6 +978,31 @@ async function loadJoinRequests() {
     });
   });
 }
+async function archiveTestJoinRequest(requestId) {
+  if (!requestId) return;
+
+  const confirmed = confirm(
+    'Archiver cette demande comme test ? Elle disparaîtra des demandes principales mais restera retrouvable dans Tests archivés.'
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await tapCartaSupabase
+    .from('join_requests')
+    .update({
+      status: 'archived_test'
+    })
+    .eq('id', requestId);
+
+  if (error) {
+    alert('Erreur archivage test.');
+    console.error(error);
+    return;
+  }
+
+  await loadJoinRequests();
+}
+
 async function validateJoinRequest(restaurantId, requestId, selectedOffer, emailConfirmed, request) {
   if (!restaurantId || !requestId) return;
 
