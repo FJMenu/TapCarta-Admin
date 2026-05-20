@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.9';
+  const APP_VERSION = 'V1.3.4.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -776,7 +776,7 @@ async function loadJoinRequests() {
     ? `<span class="inline-flex items-center rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-sm font-bold text-gold">● ${pendingRequests.length} demande(s) de contrat à traiter</span><span class="ml-2 text-cream/55">${processedRequests.length} traitée(s).</span>`
     : `<span class="text-cream/60">0 demande à traiter · ${processedRequests.length} traitée(s).</span>`;
 
-  const renderRequestCard = (request, isProcessed) => {
+  const renderRequestCard = (request, isProcessed, context = 'main') => {
     const offerLabel = request.selected_offer || request.restaurants?.pack_code || 'standard';
     const cityLabel = [request.city, request.country].filter(Boolean).join(' · ') || 'Localisation non indiquée';
 
@@ -881,43 +881,67 @@ async function loadJoinRequests() {
             </button>
 
             ${
-              isProcessed
+              context === 'archive'
                 ? `
-                  <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
-                    ✓ Traité
+                  <div class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300">
+                    Archivé
                   </div>
 
                   <button
                     type="button"
-                    data-action="archive-test-request"
+                    data-action="restore-test-request"
                     data-request-id="${request.id}"
-                    class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
-                  >
-                    Archiver test
-                  </button>
-                `
-                : `
-                  <button
-                    type="button"
-                    data-action="validate-join-request"
-                    data-restaurant-id="${request.restaurant_id}"
-                    data-request-id="${request.id}"
-                    data-selected-offer="${offerLabel}"
-                    data-email-confirmed="${request.email_confirmed ? 'true' : 'false'}"
                     class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
                   >
-                    Valider ${offerLabel}
+                    Restaurer
                   </button>
 
                   <button
                     type="button"
-                    data-action="archive-test-request"
+                    data-action="delete-test-request"
                     data-request-id="${request.id}"
-                    class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
+                    class="rounded-xl border border-red-500/40 bg-red-600/15 px-4 py-3 text-sm font-semibold text-red-200"
                   >
-                    Archiver test
+                    Supprimer définitivement
                   </button>
                 `
+                : isProcessed
+                  ? `
+                    <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
+                      ✓ Traité
+                    </div>
+
+                    <button
+                      type="button"
+                      data-action="archive-test-request"
+                      data-request-id="${request.id}"
+                      class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
+                    >
+                      Archiver test
+                    </button>
+                  `
+                  : `
+                    <button
+                      type="button"
+                      data-action="validate-join-request"
+                      data-restaurant-id="${request.restaurant_id}"
+                      data-request-id="${request.id}"
+                      data-selected-offer="${offerLabel}"
+                      data-email-confirmed="${request.email_confirmed ? 'true' : 'false'}"
+                      class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+                    >
+                      Valider ${offerLabel}
+                    </button>
+
+                    <button
+                      type="button"
+                      data-action="archive-test-request"
+                      data-request-id="${request.id}"
+                      class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
+                    >
+                      Archiver test
+                    </button>
+                  `
             }
           </div>
         </div>
@@ -948,16 +972,19 @@ async function loadJoinRequests() {
       }
     </div>
 
-    <div class="mt-5 space-y-3">
-      <div class="text-xs uppercase tracking-wide text-red-300/80 font-semibold">
-        Tests archivés
+    <details class="mt-5 rounded-2xl border border-red-400/20 bg-red-500/5 p-4">
+      <summary class="cursor-pointer text-xs uppercase tracking-wide text-red-300/80 font-semibold">
+        Archives / Corbeille (${archivedTestRequests.length})
+      </summary>
+
+      <div class="mt-4 space-y-3">
+        ${
+          archivedTestRequests.length
+            ? archivedTestRequests.map(request => renderRequestCard(request, true, 'archive')).join('')
+            : '<div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/55">Aucune demande archivée.</div>'
+        }
       </div>
-      ${
-        archivedTestRequests.length
-          ? archivedTestRequests.map(request => renderRequestCard(request, true)).join('')
-          : '<div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/55">Aucun test archivé.</div>'
-      }
-    </div>
+    </details>
   `;
 
   list.querySelectorAll('[data-action="validate-join-request"]').forEach(button => {
@@ -986,13 +1013,84 @@ async function loadJoinRequests() {
       await archiveTestJoinRequest(button.dataset.requestId);
     });
   });
+
+  list.querySelectorAll('[data-action="restore-test-request"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await restoreTestJoinRequest(button.dataset.requestId);
+    });
+  });
+
+  list.querySelectorAll('[data-action="delete-test-request"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await deleteTestJoinRequest(button.dataset.requestId);
+    });
+  });
 }
+function showTapCartaConfirmModal({
+  title,
+  message,
+  confirmLabel = 'Confirmer',
+  cancelLabel = 'Annuler',
+  danger = false
+}) {
+  return new Promise((resolve) => {
+    const existingModal = document.getElementById('tapcarta-confirm-modal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'tapcarta-confirm-modal';
+    modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4';
+
+    modal.innerHTML = `
+      <div class="w-full max-w-md rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
+        <div class="mb-4">
+          <div class="font-display text-2xl text-cream">${title}</div>
+          <div class="mt-2 text-sm leading-relaxed text-cream/70">${message}</div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button
+            type="button"
+            data-modal-action="cancel"
+            class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+          >
+            ${cancelLabel}
+          </button>
+
+          <button
+            type="button"
+            data-modal-action="confirm"
+            class="rounded-xl border ${danger ? 'border-red-400/40 bg-red-600/20 text-red-200' : 'border-gold/30 bg-gold/10 text-gold'} px-4 py-3 text-sm font-semibold"
+          >
+            ${confirmLabel}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('[data-modal-action="cancel"]').addEventListener('click', () => {
+      modal.remove();
+      resolve(false);
+    });
+
+    modal.querySelector('[data-modal-action="confirm"]').addEventListener('click', () => {
+      modal.remove();
+      resolve(true);
+    });
+  });
+}
+
 async function archiveTestJoinRequest(requestId) {
   if (!requestId) return;
 
-  const confirmed = confirm(
-    'Archiver cette demande comme test ? Elle disparaîtra des demandes principales mais restera retrouvable dans Tests archivés.'
-  );
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Archiver cette demande ?',
+    message: 'Elle disparaîtra de la page principale et restera récupérable dans Archives / Corbeille.',
+    confirmLabel: 'Archiver',
+    cancelLabel: 'Annuler'
+  });
 
   if (!confirmed) return;
 
@@ -1005,6 +1103,72 @@ async function archiveTestJoinRequest(requestId) {
 
   if (error) {
     alert('Erreur archivage test.');
+    console.error(error);
+    return;
+  }
+
+  await loadJoinRequests();
+}
+
+async function restoreTestJoinRequest(requestId) {
+  if (!requestId) return;
+
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Restaurer cette demande ?',
+    message: 'Elle reviendra dans les demandes à traiter.',
+    confirmLabel: 'Restaurer',
+    cancelLabel: 'Annuler'
+  });
+
+  if (!confirmed) return;
+
+  const { error } = await tapCartaSupabase
+    .from('join_requests')
+    .update({
+      status: 'pending_review'
+    })
+    .eq('id', requestId);
+
+  if (error) {
+    alert('Erreur restauration.');
+    console.error(error);
+    return;
+  }
+
+  await loadJoinRequests();
+}
+
+async function deleteTestJoinRequest(requestId) {
+  if (!requestId) return;
+
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Supprimer définitivement ?',
+    message: 'Cette action supprimera réellement cette demande de Supabase. Elle ne pourra pas être restaurée.',
+    confirmLabel: 'Supprimer définitivement',
+    cancelLabel: 'Annuler',
+    danger: true
+  });
+
+  if (!confirmed) return;
+
+  const doubleConfirmed = await showTapCartaConfirmModal({
+    title: 'Confirmation finale',
+    message: 'Dernière vérification : cette suppression est définitive.',
+    confirmLabel: 'Oui, supprimer',
+    cancelLabel: 'Annuler',
+    danger: true
+  });
+
+  if (!doubleConfirmed) return;
+
+  const { error } = await tapCartaSupabase
+    .from('join_requests')
+    .delete()
+    .eq('id', requestId)
+    .eq('status', 'archived_test');
+
+  if (error) {
+    alert('Erreur suppression définitive.');
     console.error(error);
     return;
   }
