@@ -747,8 +747,12 @@ async function loadJoinRequests() {
     return;
   }
 
+  const archivedTestRequests = data.filter(request => request.status === 'archived_test');
   const pendingRequests = data.filter(request => request.status === 'pending_review');
-  const processedRequests = data.filter(request => request.status !== 'pending_review');
+  const processedRequests = data.filter(request =>
+    request.status !== 'pending_review' &&
+    request.status !== 'archived_test'
+  );
 
   const confirmedPendingRequests = pendingRequests.filter(request => request.email_confirmed);
 
