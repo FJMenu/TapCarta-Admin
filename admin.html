@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.6';
+  const APP_VERSION = 'V1.3.3.7';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -963,34 +963,6 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
       ? 'light_active'
       : 'setup_in_progress';
 
-  const { error: restaurantError } = await tapCartaSupabase
-    .from('restaurants')
-    .update({
-      status: nextRestaurantStatus,
-      pack_code: offer,
-      validated_at: new Date().toISOString()
-    })
-    .eq('id', restaurantId);
-
-  if (restaurantError) {
-    alert('Erreur validation restaurant.');
-    console.error(restaurantError);
-    return;
-  }
-
-  const { error: requestError } = await tapCartaSupabase
-    .from('join_requests')
-    .update({
-      status: 'approved'
-    })
-    .eq('id', requestId);
-
-  if (requestError) {
-    alert('Restaurant validé, mais erreur statut demande.');
-    console.error(requestError);
-    return;
-  }
-
   const shouldSendActivationEmail = offer === 'standard' || offer === 'plus';
 
   if (shouldSendActivationEmail && request) {
@@ -1002,6 +974,13 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
         alert('Session admin introuvable. Déconnecte-toi puis reconnecte-toi avant de valider.');
         return;
       }
+
+      const activationLink =
+        `https://tapcarta.com/activate.html` +
+        `?restaurant_id=${encodeURIComponent(restaurantId)}` +
+        `&join_request_id=${encodeURIComponent(requestId)}` +
+        `&pack=${encodeURIComponent(offer)}` +
+        `&lang=${encodeURIComponent(request.preferred_language || 'fr')}`;
 
       const activationResponse = await fetch('https://uzuejudgccpnuzqefjre.supabase.co/functions/v1/smooth-responder', {
         method: 'POST',
@@ -1015,7 +994,9 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
           contactEmail: request.contact_email || '',
           preferredLanguage: request.preferred_language || 'fr',
           selectedOffer: offer,
-          activationLink: `https://tapcarta.com/activate.html?pack=${encodeURIComponent(offer)}`
+          restaurantId: restaurantId,
+          joinRequestId: requestId,
+          activationLink: activationLink
         })
       });
 
@@ -1023,18 +1004,51 @@ async function validateJoinRequest(restaurantId, requestId, selectedOffer, email
 
       if (!activationResponse.ok) {
         console.error('Activation email failed:', activationResponse.status, activationResult);
-        alert('Demande validée, mais l’email d’activation n’a pas été envoyé. Voir console / logs Supabase.');
+        alert('Email d’activation non envoyé. La demande reste à traiter.');
         return;
       }
 
       console.log('Activation email sent:', activationResult);
-      alert('Demande validée. Email d’activation envoyé.');
     } catch (emailError) {
       console.error('Activation email error:', emailError);
-      alert('Demande validée, mais erreur lors de l’envoi de l’email d’activation.');
+      alert('Erreur lors de l’envoi de l’email d’activation. La demande reste à traiter.');
       return;
     }
   }
+
+  const { error: restaurantError } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      status: nextRestaurantStatus,
+      pack_code: offer,
+      validated_at: new Date().toISOString()
+    })
+    .eq('id', restaurantId);
+
+  if (restaurantError) {
+    alert('Email éventuellement envoyé, mais erreur validation restaurant. Vérifier Supabase.');
+    console.error(restaurantError);
+    return;
+  }
+
+  const { error: requestError } = await tapCartaSupabase
+    .from('join_requests')
+    .update({
+      status: 'approved'
+    })
+    .eq('id', requestId);
+
+  if (requestError) {
+    alert('Restaurant mis à jour, mais erreur statut demande. Vérifier Supabase.');
+    console.error(requestError);
+    return;
+  }
+
+  alert(
+    shouldSendActivationEmail
+      ? 'Demande validée. Email d’activation envoyé.'
+      : 'Demande validée.'
+  );
 
   await loadJoinRequests();
 }
