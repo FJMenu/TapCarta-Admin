@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.3.8';
+  const APP_VERSION = 'V1.3.3.9';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -886,6 +886,15 @@ async function loadJoinRequests() {
                   <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300">
                     ✓ Traité
                   </div>
+
+                  <button
+                    type="button"
+                    data-action="archive-test-request"
+                    data-request-id="${request.id}"
+                    class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
+                  >
+                    Archiver test
+                  </button>
                 `
                 : `
                   <button
