@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.11';
+  const APP_VERSION = 'V1.3.4.12';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1290,7 +1290,7 @@ function showTapCartaManualActivationModal(request) {
               id="manual-activation-reason"
               rows="4"
               class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none"
-              placeholder="Exemple : Bistro Belga — restaurant réel utilisé comme vitrine/test sans GoCardless."
+              placeholder="Exemple : Bistro Belga — restaurant réel utilisé comme vitrine/pilote sans paiement validé."
             ></textarea>
           </div>
 
@@ -1371,7 +1371,7 @@ async function activateJoinRequestWithoutPayment(restaurantId, requestId, select
     .eq('id', restaurantId);
 
   if (restaurantError) {
-    alert('Erreur activation restaurant sans GoCardless.');
+    alert('Erreur activation spéciale du restaurant.');
     console.error(restaurantError);
     return;
   }
@@ -1445,7 +1445,7 @@ async function activateJoinRequestWithoutPayment(restaurantId, requestId, select
     return;
   }
 
-  alert('Restaurant activé sans GoCardless. Aucun paiement n’a été marqué comme validé.');
+  alert('Activation spéciale enregistrée. Aucun paiement n’a été marqué comme validé.');
 
   await loadJoinRequests();
 }
@@ -1462,7 +1462,7 @@ async function cancelSpecialActivation(restaurantId, requestId, request) {
 
   const confirmed = await showTapCartaConfirmModal({
     title: 'Annuler cette activation spéciale ?',
-    message: 'Le restaurant reviendra en demande à traiter. Le paiement GoCardless restera non validé. Cette action sert uniquement à corriger un test, une vitrine, une promo ou une activation manuelle.',
+    message: 'Le restaurant reviendra en demande à traiter. Aucun paiement ne sera marqué comme validé. Cette action sert uniquement à corriger un pilote, une vitrine, une promo ou une activation manuelle.',
     confirmLabel: 'Annuler l’activation spéciale',
     cancelLabel: 'Conserver',
     danger: true
@@ -2474,7 +2474,7 @@ function recalculateBilling() {
         const missingItems = [
           data.onboarding.menu_status === 'missing' ? 'menu' : '',
           data.onboarding.legal_info_status === 'missing' ? 'infos légales' : '',
-          data.onboarding.gocardless_status !== 'validated' ? 'GoCardless' : ''
+          data.onboarding.gocardless_status !== 'validated' ? 'paiement' : ''
         ].filter(Boolean);
 
         onboardingSummary.textContent = missingItems.length
@@ -3155,7 +3155,7 @@ function renderEstablishmentsList() {
       onboarding?.menu_status === 'missing' || !onboarding?.menu_status ? 'menu' : '',
       onboarding?.legal_info_status === 'missing' || !onboarding?.legal_info_status ? 'infos légales' : '',
       onboarding?.gocardless_status && onboarding.gocardless_status !== 'validated' && onboarding.gocardless_status !== 'not_required'
-        ? 'GoCardless'
+        ? 'Paiement'
         : ''
     ].filter(Boolean);
 
@@ -3195,7 +3195,7 @@ function renderEstablishmentsList() {
 
             <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
-                <div class="text-[10px] uppercase tracking-wide text-cream/40">GoCardless</div>
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Paiement</div>
                 <div class="mt-1 text-sm font-semibold text-cream/82">${gocardlessLabel}</div>
               </div>
 
