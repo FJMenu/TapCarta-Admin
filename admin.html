@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.10';
+  const APP_VERSION = 'V1.3.4.11';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -95,25 +95,34 @@
             <option>Chargement...</option>
           </select>
         </div>
-<button
-  id="nav-establishments-btn"
-  type="button"
-  class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
->
-  <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
-  <span>Établissement</span>
-</button>
+<nav class="space-y-2">
+  <button
+    id="nav-establishments-btn"
+    type="button"
+    class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
+  >
+    <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
+    <span>Établissement</span>
+  </button>
 
-          <button class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80">
-            <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
-            <span>Modules</span>
-          </button>
+  <button
+    id="nav-modules-btn"
+    type="button"
+    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
+  >
+    <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
+    <span>Modules</span>
+  </button>
 
-          <button class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80">
-            <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
-            <span>Contrat / Facturation</span>
-          </button>
-        </nav>
+  <button
+    id="nav-billing-btn"
+    type="button"
+    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
+  >
+    <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
+    <span>Contrat / Facturation</span>
+  </button>
+</nav>
       </aside>
 
       <main class="p-5 md:p-8">
@@ -270,7 +279,7 @@
   <div id="commercial-packs-list" class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"></div>
 </section>
 
-        <section class="grid gap-6 xl:grid-cols-3">
+        <section id="restaurant-details-section" class="grid gap-6 xl:grid-cols-3">
           <article class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
             <div class="flex items-center gap-3 mb-5">
               <div class="w-10 h-10 rounded-2xl bg-gold/12 border border-gold/25 flex items-center justify-center">
@@ -333,7 +342,7 @@
             </div>
           </article>
 
-          <article class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+          <article id="modules-section" class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
             <div class="flex items-center gap-3 mb-5">
               <div class="w-10 h-10 rounded-2xl bg-gold/12 border border-gold/25 flex items-center justify-center">
                 <i data-lucide="toggle-left" class="w-5 h-5 text-gold"></i>
@@ -347,7 +356,7 @@
             <div class="space-y-3" id="modules-list"></div>
           </article>
 
-          <article class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+          <article id="billing-section" class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
             <div class="flex items-center gap-3 mb-5">
               <div class="w-10 h-10 rounded-2xl bg-gold/12 border border-gold/25 flex items-center justify-center">
                 <i data-lucide="file-text" class="w-5 h-5 text-gold"></i>
@@ -3288,6 +3297,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('establishments-section')?.scrollIntoView({
         behavior: 'smooth',
         block: 'start'
+      });
+    });
+  }
+
+  const navModulesBtn = document.getElementById('nav-modules-btn');
+  if (navModulesBtn) {
+    navModulesBtn.addEventListener('click', () => {
+      document.getElementById('modules-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    });
+  }
+
+  const navBillingBtn = document.getElementById('nav-billing-btn');
+  if (navBillingBtn) {
+    navBillingBtn.addEventListener('click', () => {
+      document.getElementById('billing-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
       });
     });
   }
