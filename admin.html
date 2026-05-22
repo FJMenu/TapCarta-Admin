@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.9';
+  const APP_VERSION = 'V1.3.4.10';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -95,12 +95,14 @@
             <option>Chargement...</option>
           </select>
         </div>
-
-        <nav class="space-y-2">
-          <button class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream">
-            <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
-            <span>Établissement</span>
-          </button>
+<button
+  id="nav-establishments-btn"
+  type="button"
+  class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
+>
+  <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
+  <span>Établissement</span>
+</button>
 
           <button class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80">
             <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
@@ -211,7 +213,10 @@
   <div id="join-requests-list" class="space-y-3"></div>
 </section>
 
-<section class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+<section
+  id="establishments-section"
+  class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6"
+>
   <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
     <div>
       <h3 class="font-display text-xl font-bold text-cream">Établissements</h3>
@@ -3276,6 +3281,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('undo-btn-bottom').addEventListener('click', () => {
     undoLastChange();
   });
+
+  const navEstablishmentsBtn = document.getElementById('nav-establishments-btn');
+  if (navEstablishmentsBtn) {
+    navEstablishmentsBtn.addEventListener('click', () => {
+      document.getElementById('establishments-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
+  }
 
   updateEditModeButton();
   applyEditMode();
