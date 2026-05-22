@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.12';
+  const APP_VERSION = 'V1.3.5.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -230,7 +230,7 @@
     <div>
       <h3 class="font-display text-xl font-bold text-cream">Établissements</h3>
       <p class="text-sm text-cream/60 mt-1">
-        Vue cockpit — restaurants actifs, en création, vitrines, tests et suspendus
+        Vue cockpit — restaurants actifs, en création, vitrines, pilotes et suspendus
       </p>
     </div>
 
@@ -242,7 +242,7 @@
         <option value="all">Tous les établissements</option>
         <option value="active">Actifs</option>
         <option value="setup">En création</option>
-        <option value="special">Vitrines / tests / partenaires</option>
+        <option value="special">Vitrines / pilotes / partenaires</option>
         <option value="suspended">Suspendus / rejetés</option>
         <option value="light">Pack Light</option>
         <option value="standard">Pack Standard</option>
@@ -392,6 +392,69 @@
 </section>
 
 <section class="mt-6">
+  <article class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+    <div class="mb-5 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-gold/12 border border-gold/25 flex items-center justify-center">
+        <i data-lucide="route" class="w-5 h-5 text-gold"></i>
+      </div>
+      <div>
+        <h3 class="font-display text-lg font-bold text-cream">Progression du dossier</h3>
+        <p class="text-xs text-cream/60 mt-1">Suivi global — de la demande reçue à la page active</p>
+      </div>
+    </div>
+
+    <div id="workflow-steps-summary" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div id="workflow-step-1" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 1/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Demande reçue</div>
+      </div>
+
+      <div id="workflow-step-2" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 2/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Email confirmé</div>
+      </div>
+
+      <div id="workflow-step-3" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 3/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Activation envoyée</div>
+      </div>
+
+      <div id="workflow-step-4" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 4/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Contrat signé</div>
+      </div>
+
+      <div id="workflow-step-5" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 5/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Paiement / modalité validée</div>
+      </div>
+
+      <div id="workflow-step-6" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 6/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Page d’attente + Resto + QR réceptionné</div>
+      </div>
+
+      <div id="workflow-step-7" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 7/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Éléments client reçus</div>
+      </div>
+
+      <div id="workflow-step-8" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 8/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Page finale créée / vérifiée</div>
+      </div>
+
+      <div id="workflow-step-9" class="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4">
+        <div class="text-xs font-bold uppercase tracking-wide text-amber-300">Étape 9/9</div>
+        <div class="mt-1 text-sm font-semibold text-cream">Page finale publiée / active</div>
+      </div>
+    </div>
+
+    <div class="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/65">
+      Orange = en attente / en cours · Vert = fait · Rouge = bloquant
+    </div>
+  </article>
+
   <article class="rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
     <div class="flex items-center gap-3 mb-5">
       <div class="w-10 h-10 rounded-2xl bg-gold/12 border border-gold/25 flex items-center justify-center">
@@ -1260,7 +1323,7 @@ function showTapCartaManualActivationModal(request) {
           <div class="font-display text-2xl text-cream">Activation spéciale</div>
           <div class="mt-2 text-sm leading-relaxed text-cream/70">
             Cette action active <strong>${restaurantName}</strong> sans paiement validé.
-            Elle doit être utilisée uniquement pour un test interne, une vitrine, un partenaire,
+            Elle doit être utilisée uniquement pour un pilote interne, une vitrine, un partenaire,
             une promo ou une activation manuelle exceptionnelle.
           </div>
         </div>
@@ -1565,7 +1628,7 @@ async function archiveTestJoinRequest(requestId) {
     .eq('id', requestId);
 
   if (error) {
-    alert('Erreur archivage test.');
+    alert('Erreur archivage.');
     console.error(error);
     return;
   }
