@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.6';
+  const APP_VERSION = 'V1.3.4.7';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -2253,19 +2253,6 @@ function applyEditMode() {
     checkbox.disabled = !editMode;
   });
 
-  const addCategoryButton = document.getElementById('add-category-btn');
-  if (addCategoryButton) {
-    addCategoryButton.disabled = !editMode;
-  }
-
-  document.querySelectorAll('#menu-categories-list input').forEach((input) => {
-    input.disabled = !editMode;
-    input.readOnly = !editMode;
-  });
-
-  document.querySelectorAll('#menu-categories-list button').forEach((button) => {
-    button.disabled = !editMode;
-  });
 }
 
 function undoLastChange() {
@@ -2298,51 +2285,10 @@ function bindUndoTracking() {
     pushUndoSnapshot(`module-${e.target.dataset.module}-${Date.now()}`, true);
   }, true);
 
-  document.getElementById('add-category-btn').addEventListener('click', () => {
-    pushUndoSnapshot(`add-category-${Date.now()}`, true);
-  }, true);
-
-  document.getElementById('menu-categories-list').addEventListener('focusin', (e) => {
-    if (e.target.dataset.field === 'category-name') {
-      pushUndoSnapshot(`category-name-${e.target.dataset.categoryIndex}`);
-      return;
-    }
-
-    if (e.target.dataset.field === 'item-name') {
-      pushUndoSnapshot(`item-name-${e.target.dataset.categoryIndex}-${e.target.dataset.itemIndex}`);
-      return;
-    }
-
-    if (e.target.dataset.field === 'item-subtitle') {
-      pushUndoSnapshot(`item-subtitle-${e.target.dataset.categoryIndex}-${e.target.dataset.itemIndex}`);
-      return;
-    }
-
-    if (e.target.dataset.field === 'item-price') {
-      pushUndoSnapshot(`item-price-${e.target.dataset.categoryIndex}-${e.target.dataset.itemIndex}`);
-    }
-  }, true);
-
-  document.getElementById('menu-categories-list').addEventListener('click', (e) => {
-  const actionButton = e.target.closest('[data-action="add-item"], [data-action="move-item-up"], [data-action="move-item-down"], [data-action="delete-item"], [data-action="move-category-up"], [data-action="move-category-down"], [data-action="delete-category"]');
-    if (!actionButton) return;
-
-    pushUndoSnapshot(`menu-action-${Date.now()}`, true);
-  }, true);
-
-  document.getElementById('menu-categories-list').addEventListener('change', (e) => {
-    if (e.target.dataset.field !== 'item-visible') return;
-    pushUndoSnapshot(`item-visible-${Date.now()}`, true);
-  }, true);
-
   document.addEventListener('focusout', (e) => {
     if (
       e.target.id === 'field-name' ||
-      e.target.id === 'field-languages' ||
-      e.target.dataset.field === 'category-name' ||
-      e.target.dataset.field === 'item-name' ||
-      e.target.dataset.field === 'item-subtitle' ||
-      e.target.dataset.field === 'item-price'
+      e.target.id === 'field-languages'
     ) {
       resetUndoSource();
     }
@@ -3134,156 +3080,11 @@ function bindFormEvents() {
     saveCurrentRestaurantToSupabase();
   });
 
-  document.getElementById('menu-categories-list').addEventListener('input', (e) => {
-    if (!currentRestaurantData) return;
-
-    if (e.target.dataset.field === 'category-name') {
-      const categoryIndex = Number(e.target.dataset.categoryIndex);
-      if (Number.isNaN(categoryIndex)) return;
-      if (!currentRestaurantData.menu?.categories?.[categoryIndex]) return;
-
-      currentRestaurantData.menu.categories[categoryIndex].name = e.target.value;
-      markDirty();
-      return;
-    }
-
-    if (e.target.dataset.field === 'item-name') {
-      const categoryIndex = Number(e.target.dataset.categoryIndex);
-      const itemIndex = Number(e.target.dataset.itemIndex);
-
-      if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-      if (!currentRestaurantData.menu?.categories?.[categoryIndex]?.items?.[itemIndex]) return;
-
-      currentRestaurantData.menu.categories[categoryIndex].items[itemIndex].name = e.target.value;
-      markDirty();
-      return;
-    }
-
-    if (e.target.dataset.field === 'item-subtitle') {
-      const categoryIndex = Number(e.target.dataset.categoryIndex);
-      const itemIndex = Number(e.target.dataset.itemIndex);
-
-      if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-      if (!currentRestaurantData.menu?.categories?.[categoryIndex]?.items?.[itemIndex]) return;
-
-      currentRestaurantData.menu.categories[categoryIndex].items[itemIndex].subtitle = e.target.value;
-      markDirty();
-      return;
-    }
-
-    if (e.target.dataset.field === 'item-price') {
-      const categoryIndex = Number(e.target.dataset.categoryIndex);
-      const itemIndex = Number(e.target.dataset.itemIndex);
-
-      if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-      if (!currentRestaurantData.menu?.categories?.[categoryIndex]?.items?.[itemIndex]) return;
-
-      const parsedPrice = parseFloat(e.target.value);
-      currentRestaurantData.menu.categories[categoryIndex].items[itemIndex].price = Number.isNaN(parsedPrice) ? 0 : parsedPrice;
-      markDirty();
-      return;
-    }
-  });
-
-  document.getElementById('menu-categories-list').addEventListener('change', (e) => {
-    if (!currentRestaurantData) return;
-    if (e.target.dataset.field !== 'item-visible') return;
-
-    const categoryIndex = Number(e.target.dataset.categoryIndex);
-    const itemIndex = Number(e.target.dataset.itemIndex);
-
-    if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-    if (!currentRestaurantData.menu?.categories?.[categoryIndex]?.items?.[itemIndex]) return;
-
-    currentRestaurantData.menu.categories[categoryIndex].items[itemIndex].visible = e.target.checked;
-    renderMenuCategories(currentRestaurantData.menu);
-    markDirty();
-  });
-
-  document.getElementById('menu-categories-list').addEventListener('click', (e) => {
-    const addButton = e.target.closest('[data-action="add-item"]');
-    if (addButton) {
-      const categoryIndex = Number(addButton.dataset.categoryIndex);
-      if (Number.isNaN(categoryIndex)) return;
-
-      addItemToCategory(categoryIndex);
-      markDirty();
-      return;
-    }
-
-    const moveUpButton = e.target.closest('[data-action="move-item-up"]');
-    if (moveUpButton) {
-      const categoryIndex = Number(moveUpButton.dataset.categoryIndex);
-      const itemIndex = Number(moveUpButton.dataset.itemIndex);
-
-      if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-
-      moveItem(categoryIndex, itemIndex, 'up');
-      markDirty();
-      return;
-    }
-
-    const moveDownButton = e.target.closest('[data-action="move-item-down"]');
-    if (moveDownButton) {
-      const categoryIndex = Number(moveDownButton.dataset.categoryIndex);
-      const itemIndex = Number(moveDownButton.dataset.itemIndex);
-
-      if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-
-      moveItem(categoryIndex, itemIndex, 'down');
-      markDirty();
-      return;
-    }
-
-    const moveCategoryUpButton = e.target.closest('[data-action="move-category-up"]');
-    if (moveCategoryUpButton) {
-      const categoryIndex = Number(moveCategoryUpButton.dataset.categoryIndex);
-      if (Number.isNaN(categoryIndex)) return;
-
-      moveCategory(categoryIndex, 'up');
-      markDirty();
-      return;
-    }
-
-    const moveCategoryDownButton = e.target.closest('[data-action="move-category-down"]');
-    if (moveCategoryDownButton) {
-      const categoryIndex = Number(moveCategoryDownButton.dataset.categoryIndex);
-      if (Number.isNaN(categoryIndex)) return;
-
-      moveCategory(categoryIndex, 'down');
-      markDirty();
-      return;
-    }
-
-    const deleteCategoryButton = e.target.closest('[data-action="delete-category"]');
-    if (deleteCategoryButton) {
-      const categoryIndex = Number(deleteCategoryButton.dataset.categoryIndex);
-      if (Number.isNaN(categoryIndex)) return;
-
-      deleteCategory(categoryIndex);
-      markDirty();
-      return;
-    }
-
-    const deleteItemButton = e.target.closest('[data-action="delete-item"]');
-    if (deleteItemButton) {
-      const categoryIndex = Number(deleteItemButton.dataset.categoryIndex);
-      const itemIndex = Number(deleteItemButton.dataset.itemIndex);
-
-      if (Number.isNaN(categoryIndex) || Number.isNaN(itemIndex)) return;
-
-      deleteItem(categoryIndex, itemIndex);
-      markDirty();
-    }
-  });
-
   document.getElementById('add-category-btn').addEventListener('click', () => {
     addCategory();
     markDirty();
   });
 }
-
-
 
      async function loadRestaurantData(id) {
   const response = await fetch(`./restaurants/${id}.json`);
