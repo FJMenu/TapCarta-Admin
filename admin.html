@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.2';
+  const APP_VERSION = 'V1.3.4.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -784,6 +784,34 @@ async function loadJoinRequests() {
     const offerLabel = request.selected_offer || request.restaurants?.pack_code || 'standard';
     const cityLabel = [request.city, request.country].filter(Boolean).join(' · ') || 'Localisation non indiquée';
 
+    const activationMode = request.restaurants?.activation_mode || '';
+    const systemActivatedAt = request.restaurants?.system_activated_at || '';
+
+    const activationModeLabels = {
+      paid: 'Payant',
+      free_test: 'Test gratuit',
+      promo: 'Promo',
+      partner: 'Partenaire',
+      showcase: 'Vitrine',
+      manual: 'Manuel'
+    };
+
+    const activationLabel = activationMode
+      ? (activationModeLabels[activationMode] || activationMode)
+      : 'Non activé';
+
+    const activationBadgeClass = systemActivatedAt
+      ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300'
+      : activationMode
+        ? 'border-amber-400/30 bg-amber-500/10 text-amber-300'
+        : 'border-white/10 bg-white/[0.03] text-cream/60';
+
+    const processedStatusLabel = systemActivatedAt
+      ? 'Restaurant activé'
+      : activationMode
+        ? 'Activation spéciale'
+        : 'Demande traitée';
+
     const formatList = (value) => {
       if (Array.isArray(value)) {
         return value.length ? value.join(' · ') : '—';
@@ -811,11 +839,14 @@ async function loadJoinRequests() {
               <div class="text-base font-bold ${isProcessed ? 'text-emerald-300' : 'text-gold'}">
                 ${request.restaurant_trade_name || 'Restaurant sans nom'}
               </div>
-              <span class="rounded-full border ${isProcessed ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300' : 'border-gold/25 bg-gold/10 text-gold'} px-3 py-1 text-xs font-semibold">
-                ${isProcessed ? 'Demande validée' : 'À traiter'}
+              <span class="rounded-full border ${isProcessed ? activationBadgeClass : 'border-gold/25 bg-gold/10 text-gold'} px-3 py-1 text-xs font-semibold">
+                ${isProcessed ? processedStatusLabel : 'À traiter'}
               </span>
               <span class="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-cream/70">
                 Offre : ${offerLabel}
+              </span>
+              <span class="rounded-full border ${activationBadgeClass} px-3 py-1 text-xs font-semibold">
+                Activation : ${activationLabel}
               </span>
             </div>
 
@@ -925,7 +956,7 @@ async function loadJoinRequests() {
                     </button>
                   `
                   : `
-                    <button
+                     <button
                       type="button"
                       data-action="validate-join-request"
                       data-restaurant-id="${request.restaurant_id}"
@@ -935,6 +966,17 @@ async function loadJoinRequests() {
                       class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
                     >
                       Valider ${offerLabel}
+                    </button>
+
+                    <button
+                      type="button"
+                      data-action="activate-without-payment"
+                      data-restaurant-id="${request.restaurant_id}"
+                      data-request-id="${request.id}"
+                      data-selected-offer="${offerLabel}"
+                      class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
+                    >
+                      Activer sans GoCardless
                     </button>
 
                     <button
@@ -1012,6 +1054,19 @@ async function loadJoinRequests() {
     });
   });
 
+  list.querySelectorAll('[data-action="activate-without-payment"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const request = data.find(item => item.id === button.dataset.requestId);
+
+      await activateJoinRequestWithoutPayment(
+        button.dataset.restaurantId,
+        button.dataset.requestId,
+        button.dataset.selectedOffer,
+        request
+      );
+    });
+  });
+
   list.querySelectorAll('[data-action="archive-test-request"]').forEach(button => {
     button.addEventListener('click', async () => {
       await archiveTestJoinRequest(button.dataset.requestId);
@@ -1084,6 +1139,216 @@ function showTapCartaConfirmModal({
       resolve(true);
     });
   });
+}
+
+function showTapCartaManualActivationModal(request) {
+  return new Promise((resolve) => {
+    const existingModal = document.getElementById('tapcarta-manual-activation-modal');
+    if (existingModal) existingModal.remove();
+
+    const restaurantName =
+      request?.restaurant_trade_name ||
+      request?.restaurants?.name ||
+      'ce restaurant';
+
+    const modal = document.createElement('div');
+    modal.id = 'tapcarta-manual-activation-modal';
+    modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4';
+
+    modal.innerHTML = `
+      <div class="w-full max-w-xl rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
+        <div class="mb-5">
+          <div class="font-display text-2xl text-cream">Activer sans GoCardless</div>
+          <div class="mt-2 text-sm leading-relaxed text-cream/70">
+            Cette action active <strong>${restaurantName}</strong> sans paiement GoCardless.
+            Elle doit être utilisée uniquement pour un test interne, une vitrine, un partenaire,
+            une promo ou une activation manuelle exceptionnelle.
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">
+              Mode d’activation
+            </label>
+            <select
+              id="manual-activation-mode"
+              class="w-full rounded-xl border border-gold/25 bg-black/20 px-4 py-3 text-sm text-cream outline-none"
+            >
+              <option value="free_test">Test gratuit</option>
+              <option value="showcase">Restaurant vitrine</option>
+              <option value="partner">Partenaire</option>
+              <option value="promo">Offre promo</option>
+              <option value="manual">Activation manuelle exceptionnelle</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">
+              Note interne obligatoire
+            </label>
+            <textarea
+              id="manual-activation-reason"
+              rows="4"
+              class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none"
+              placeholder="Exemple : Bistro Belga — restaurant réel utilisé comme vitrine/test sans GoCardless."
+            ></textarea>
+          </div>
+
+          <div class="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            Aucun paiement ne sera marqué comme validé. GoCardless passera en “Non requis”.
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            data-modal-action="cancel"
+            class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+          >
+            Annuler
+          </button>
+
+          <button
+            type="button"
+            data-modal-action="confirm"
+            class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
+          >
+            Activer sans GoCardless
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('[data-modal-action="cancel"]').addEventListener('click', () => {
+      modal.remove();
+      resolve(null);
+    });
+
+    modal.querySelector('[data-modal-action="confirm"]').addEventListener('click', () => {
+      const mode = modal.querySelector('#manual-activation-mode')?.value || '';
+      const reason = modal.querySelector('#manual-activation-reason')?.value.trim() || '';
+
+      if (!reason) {
+        alert('Note interne obligatoire pour une activation sans GoCardless.');
+        return;
+      }
+
+      modal.remove();
+      resolve({
+        activationMode: mode,
+        activationReason: reason
+      });
+    });
+  });
+}
+
+async function activateJoinRequestWithoutPayment(restaurantId, requestId, selectedOffer, request) {
+  if (!restaurantId || !requestId) return;
+
+  const manualActivation = await showTapCartaManualActivationModal(request);
+  if (!manualActivation) return;
+
+  const offer = selectedOffer || request?.selected_offer || request?.restaurants?.pack_code || 'standard';
+  const now = new Date().toISOString();
+
+  const nextRestaurantStatus =
+    offer === 'light'
+      ? 'light_active'
+      : 'full_active';
+
+  const { error: restaurantError } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      status: nextRestaurantStatus,
+      pack_code: offer,
+      activation_mode: manualActivation.activationMode,
+      activation_reason: manualActivation.activationReason,
+      system_activated_at: now,
+      validated_at: now
+    })
+    .eq('id', restaurantId);
+
+  if (restaurantError) {
+    alert('Erreur activation restaurant sans GoCardless.');
+    console.error(restaurantError);
+    return;
+  }
+
+  const onboardingPayload = {
+    restaurant_id: restaurantId,
+    gocardless_status: 'not_required',
+    notes: manualActivation.activationReason
+  };
+
+  const { data: existingOnboarding, error: existingOnboardingError } = await tapCartaSupabase
+    .from('onboarding_assets')
+    .select('id, notes')
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+
+  if (existingOnboardingError) {
+    alert('Restaurant activé, mais erreur lecture onboarding.');
+    console.error(existingOnboardingError);
+    return;
+  }
+
+  if (existingOnboarding?.id) {
+    const previousNotes = existingOnboarding.notes ? `${existingOnboarding.notes}\n\n` : '';
+
+    const { error: onboardingUpdateError } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .update({
+        gocardless_status: 'not_required',
+        notes: `${previousNotes}[Activation sans GoCardless] ${manualActivation.activationReason}`
+      })
+      .eq('id', existingOnboarding.id);
+
+    if (onboardingUpdateError) {
+      alert('Restaurant activé, mais erreur mise à jour onboarding.');
+      console.error(onboardingUpdateError);
+      return;
+    }
+  } else {
+    const { error: onboardingInsertError } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .insert({
+        restaurant_id: restaurantId,
+        logo_status: 'missing',
+        menu_status: 'missing',
+        translations_status: 'missing',
+        legal_info_status: 'missing',
+        gocardless_status: 'not_required',
+        translation_service_requested: false,
+        translation_fee: 0,
+        notes: `[Activation sans GoCardless] ${manualActivation.activationReason}`
+      });
+
+    if (onboardingInsertError) {
+      alert('Restaurant activé, mais erreur création onboarding.');
+      console.error(onboardingInsertError);
+      return;
+    }
+  }
+
+  const { error: requestError } = await tapCartaSupabase
+    .from('join_requests')
+    .update({
+      status: 'approved'
+    })
+    .eq('id', requestId);
+
+  if (requestError) {
+    alert('Restaurant activé, mais erreur statut demande.');
+    console.error(requestError);
+    return;
+  }
+
+  alert('Restaurant activé sans GoCardless. Aucun paiement n’a été marqué comme validé.');
+
+  await loadJoinRequests();
 }
 
 async function archiveTestJoinRequest(requestId) {
