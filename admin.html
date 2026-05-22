@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.5.3';
+  const APP_VERSION = 'V1.3.5.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1839,6 +1839,18 @@ async function loadJoinRequestIntoAdmin(request) {
       billingStatus: restaurant.status || 'join_requested'
     },
     onboarding: onboardingData || {},
+    workflow: {
+      join_request_status: request.status || '',
+      email_confirmed: Boolean(request.email_confirmed),
+      activation_sent: request.status === 'approved',
+      restaurant_status: restaurant.status || '',
+      restaurant_validated_at: restaurant.validated_at || '',
+      system_activated_at: restaurant.system_activated_at || '',
+      contract_signed: false,
+      qr_received: false,
+      qr_blocked: false,
+      page_ready_for_review: false
+    },
     menu: {
       categories: [],
       menuVersion: 1,
@@ -2460,7 +2472,142 @@ function recalculateBilling() {
 }
 
 
-    function fillForm(data) {
+    const WORKFLOW_STEP_LABELS = {
+  1: 'Demande reçue',
+  2: 'Email confirmé',
+  3: 'Activation envoyée',
+  4: 'Contrat signé',
+  5: 'Paiement / modalité validée',
+  6: 'Page d’attente + Resto + QR réceptionné',
+  7: 'Éléments client reçus',
+  8: 'Page finale créée / vérifiée',
+  9: 'Page finale publiée / active'
+};
+
+const WORKFLOW_STEP_SHORT_LABELS = {
+  1: 'Demande',
+  2: 'Email',
+  3: 'Activation',
+  4: 'Contrat',
+  5: 'Paiement',
+  6: 'QR/Resto',
+  7: 'Éléments',
+  8: 'Page',
+  9: 'Actif'
+};
+
+function setWorkflowStepState(stepNumber, state = 'pending') {
+  const element = document.getElementById(`workflow-step-${stepNumber}`);
+  if (!element) return;
+
+  const baseClass = 'rounded-full border px-3 py-1.5 text-xs font-semibold';
+
+  const stateClasses = {
+    done: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300',
+    pending: 'border-amber-400/30 bg-amber-500/10 text-amber-300',
+    blocked: 'border-red-400/35 bg-red-500/10 text-red-300'
+  };
+
+  element.className = `${baseClass} ${stateClasses[state] || stateClasses.pending}`;
+}
+
+function renderWorkflowProgress(data = {}) {
+  const workflow = data.workflow || {};
+  const onboarding = data.onboarding || {};
+  const restaurantStatus = workflow.restaurant_status || data.billing?.billingStatus || '';
+
+  const states = {
+    1: 'pending',
+    2: 'pending',
+    3: 'pending',
+    4: 'pending',
+    5: 'pending',
+    6: 'pending',
+    7: 'pending',
+    8: 'pending',
+    9: 'pending'
+  };
+
+  if (data.identity?.id || currentRestaurantId) {
+    states[1] = 'done';
+  }
+
+  if (workflow.email_confirmed) {
+    states[2] = 'done';
+  }
+
+  if (
+    workflow.activation_sent ||
+    workflow.join_request_status === 'approved' ||
+    workflow.restaurant_validated_at
+  ) {
+    states[3] = 'done';
+  }
+
+  if (workflow.contract_signed) {
+    states[4] = 'done';
+  }
+
+  const paymentStatus = onboarding.gocardless_status || 'not_started';
+
+  if (paymentStatus === 'validated' || paymentStatus === 'not_required') {
+    states[5] = 'done';
+  } else if (paymentStatus === 'failed' || paymentStatus === 'problem') {
+    states[5] = 'blocked';
+  }
+
+  if (workflow.qr_received) {
+    states[6] = 'done';
+  } else if (workflow.qr_blocked) {
+    states[6] = 'blocked';
+  }
+
+  const clientElementsReady =
+    onboarding.menu_status !== 'missing' &&
+    onboarding.logo_status !== 'missing' &&
+    onboarding.legal_info_status !== 'missing';
+
+  if (clientElementsReady) {
+    states[7] = 'done';
+  }
+
+  if (workflow.page_ready_for_review) {
+    states[8] = 'done';
+  }
+
+  if (restaurantStatus === 'full_active' || restaurantStatus === 'light_active') {
+    states[8] = 'done';
+    states[9] = 'done';
+  }
+
+  Object.keys(states).forEach((stepNumber) => {
+    setWorkflowStepState(stepNumber, states[stepNumber]);
+  });
+
+  const firstBlockedStep = Object.entries(states).find(([, state]) => state === 'blocked');
+  const firstPendingStep = Object.entries(states).find(([, state]) => state === 'pending');
+  const currentStepNumber = firstBlockedStep?.[0] || firstPendingStep?.[0] || '9';
+  const currentState = firstBlockedStep ? 'blocked' : firstPendingStep ? 'pending' : 'done';
+
+  const currentStep = document.getElementById('workflow-current-step');
+  const currentAction = document.getElementById('workflow-current-action');
+
+  if (currentStep) {
+    currentStep.textContent = `${currentStepNumber}/9 — ${WORKFLOW_STEP_LABELS[currentStepNumber] || 'Suivi du dossier'}`;
+  }
+
+  if (currentAction) {
+    const actionLabels = {
+      done: 'Dossier terminé ou prêt selon les informations actuellement disponibles.',
+      pending: 'Étape en attente ou à compléter.',
+      blocked: 'Étape bloquante : action nécessaire avant de continuer.'
+    };
+
+    currentAction.textContent = actionLabels[currentState] || actionLabels.pending;
+  }
+}
+
+function fillForm(data) {
       const lifecycleStatus =
         data.status?.lifecycle ||
         data.identity?.status ||
@@ -2511,6 +2658,8 @@ function recalculateBilling() {
           ? `Manque : ${missingItems.join(', ')}`
           : 'Dossier prêt';
       }
+
+      renderWorkflowProgress(data);
 
       if (window.lucide) lucide.createIcons();
     }
