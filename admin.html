@@ -443,7 +443,7 @@
       </div>
 
       <div>
-        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">GoCardless</label>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Paiement</label>
       <select id="onboarding-gocardless-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
   <option value="not_started">Non commencé</option>
   <option value="pending">En attente</option>
@@ -848,11 +848,11 @@ async function loadJoinRequests() {
 
     const activationModeLabels = {
       paid: 'Payant',
-      free_test: 'Test gratuit',
+      free_test: 'Pilote gratuit',
       promo: 'Promo',
       partner: 'Partenaire',
       showcase: 'Vitrine',
-      manual: 'Manuel'
+      manual: 'Activation manuelle'
     };
 
     const activationLabel = activationMode
@@ -1027,7 +1027,7 @@ async function loadJoinRequests() {
                       data-request-id="${request.id}"
                       class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
                     >
-                      Archiver test
+                      Archiver
                     </button>
                   `
                   : `
@@ -1051,7 +1051,7 @@ async function loadJoinRequests() {
                       data-selected-offer="${offerLabel}"
                       class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
                     >
-                      Activer sans GoCardless
+                      Activation spéciale
                     </button>
 
                     <button
@@ -1060,7 +1060,7 @@ async function loadJoinRequests() {
                       data-request-id="${request.id}"
                       class="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
                     >
-                      Archiver test
+                      Archiver
                     </button>
                   `
             }
@@ -1257,9 +1257,9 @@ function showTapCartaManualActivationModal(request) {
     modal.innerHTML = `
       <div class="w-full max-w-xl rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
         <div class="mb-5">
-          <div class="font-display text-2xl text-cream">Activer sans GoCardless</div>
+          <div class="font-display text-2xl text-cream">Activation spéciale</div>
           <div class="mt-2 text-sm leading-relaxed text-cream/70">
-            Cette action active <strong>${restaurantName}</strong> sans paiement GoCardless.
+            Cette action active <strong>${restaurantName}</strong> sans paiement validé.
             Elle doit être utilisée uniquement pour un test interne, une vitrine, un partenaire,
             une promo ou une activation manuelle exceptionnelle.
           </div>
@@ -1274,7 +1274,7 @@ function showTapCartaManualActivationModal(request) {
               id="manual-activation-mode"
               class="w-full rounded-xl border border-gold/25 bg-black/20 px-4 py-3 text-sm text-cream outline-none"
             >
-              <option value="free_test">Test gratuit</option>
+              <option value="free_test">Pilote gratuit</option>
               <option value="showcase">Restaurant vitrine</option>
               <option value="partner">Partenaire</option>
               <option value="promo">Offre promo</option>
@@ -1295,7 +1295,7 @@ function showTapCartaManualActivationModal(request) {
           </div>
 
           <div class="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            Aucun paiement ne sera marqué comme validé. GoCardless passera en “Non requis”.
+            Aucun paiement ne sera marqué comme validé. Le paiement passera en “Non requis”.
           </div>
         </div>
 
@@ -1313,7 +1313,7 @@ function showTapCartaManualActivationModal(request) {
             data-modal-action="confirm"
             class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
           >
-            Activer sans GoCardless
+            Activation spéciale
           </button>
         </div>
       </div>
@@ -1331,7 +1331,7 @@ function showTapCartaManualActivationModal(request) {
       const reason = modal.querySelector('#manual-activation-reason')?.value.trim() || '';
 
       if (!reason) {
-        alert('Note interne obligatoire pour une activation sans GoCardless.');
+        alert('Note interne obligatoire pour une activation spéciale.');
         return;
       }
 
@@ -1401,7 +1401,7 @@ async function activateJoinRequestWithoutPayment(restaurantId, requestId, select
       .from('onboarding_assets')
       .update({
         gocardless_status: 'not_required',
-        notes: `${previousNotes}[Activation sans GoCardless] ${manualActivation.activationReason}`
+        notes: `${previousNotes}[activation spéciale] ${manualActivation.activationReason}`
       })
       .eq('id', existingOnboarding.id);
 
@@ -1422,7 +1422,7 @@ async function activateJoinRequestWithoutPayment(restaurantId, requestId, select
         gocardless_status: 'not_required',
         translation_service_requested: false,
         translation_fee: 0,
-        notes: `[Activation sans GoCardless] ${manualActivation.activationReason}`
+        notes: `[activation spéciale] ${manualActivation.activationReason}`
       });
 
     if (onboardingInsertError) {
@@ -3084,11 +3084,11 @@ function renderEstablishmentsList() {
 
   const activationLabels = {
     paid: 'Payant',
-    free_test: 'Test gratuit',
+    free_test: 'Pilote gratuit',
     promo: 'Promo',
     partner: 'Partenaire',
     showcase: 'Vitrine',
-    manual: 'Manuel'
+    manual: 'Activation manuelle'
   };
 
   const statusLabels = {
