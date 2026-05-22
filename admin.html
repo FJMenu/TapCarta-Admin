@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.8';
+  const APP_VERSION = 'V1.3.4.9';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -209,6 +209,47 @@
   </div>
 
   <div id="join-requests-list" class="space-y-3"></div>
+</section>
+
+<section class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
+  <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h3 class="font-display text-xl font-bold text-cream">Établissements</h3>
+      <p class="text-sm text-cream/60 mt-1">
+        Vue cockpit — restaurants actifs, en création, vitrines, tests et suspendus
+      </p>
+    </div>
+
+    <div class="flex flex-col gap-2 md:flex-row md:items-center">
+      <select
+        id="establishments-filter"
+        class="rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
+      >
+        <option value="all">Tous les établissements</option>
+        <option value="active">Actifs</option>
+        <option value="setup">En création</option>
+        <option value="special">Vitrines / tests / partenaires</option>
+        <option value="suspended">Suspendus / rejetés</option>
+        <option value="light">Pack Light</option>
+        <option value="standard">Pack Standard</option>
+        <option value="plus">Pack Plus</option>
+      </select>
+
+      <button
+        id="reload-establishments-btn"
+        type="button"
+        class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+      >
+        Recharger
+      </button>
+    </div>
+  </div>
+
+  <div id="establishments-status" class="mb-3 text-sm text-cream/60">
+    Connecte-toi pour afficher les établissements.
+  </div>
+
+  <div id="establishments-list" class="space-y-3"></div>
 </section>
 
 <section class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
@@ -597,6 +638,7 @@ async function initializeSaasAdmin() {
     showAdminSession(data.session.user.email);
     await loadJoinRequests();
     await loadCommercialPacks();
+    await loadRestaurantsIndex();
   }
 }
 
@@ -627,6 +669,7 @@ async function loginAdmin() {
   showAdminSession(data.user.email);
   await loadJoinRequests();
   await loadCommercialPacks();
+  await loadRestaurantsIndex();
 }
 
 async function logoutAdmin() {
@@ -637,6 +680,22 @@ async function logoutAdmin() {
   document.getElementById('join-requests-list').innerHTML = '';
   document.getElementById('join-requests-status').textContent =
     'Connecte-toi pour afficher les demandes.';
+
+  const establishmentsList = document.getElementById('establishments-list');
+  const establishmentsStatus = document.getElementById('establishments-status');
+  const restaurantSelect = document.getElementById('restaurant-select');
+
+  if (establishmentsList) establishmentsList.innerHTML = '';
+  if (establishmentsStatus) {
+    establishmentsStatus.textContent = 'Connecte-toi pour afficher les établissements.';
+  }
+  if (restaurantSelect) {
+    restaurantSelect.innerHTML = '<option>Connexion requise</option>';
+  }
+
+  restaurantsIndex = [];
+  currentRestaurantId = null;
+  currentRestaurantData = null;
 
   updatePendingContractAlert(0);
   stopJoinRequestsAutoRefresh();
@@ -2760,39 +2819,447 @@ function bindFormEvents() {
 
 }
 
-     async function loadRestaurantData(id) {
-  const response = await fetch(`./restaurants/${id}.json`);
-  const data = await response.json();
+async function loadRestaurantData(id) {
+  if (!id) return;
 
-  currentRestaurantData = normalizeRestaurantDataShape(data);
+  const { data: restaurant, error: restaurantError } = await tapCartaSupabase
+    .from('restaurants')
+    .select(`
+      id,
+      name,
+      slug,
+      status,
+      pack_code,
+      public_url,
+      resto_url,
+      activation_mode,
+      activation_reason,
+      system_activated_at,
+      validated_at,
+      created_at,
+      updated_at
+    `)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (restaurantError || !restaurant) {
+    alert('Erreur lecture établissement Supabase.');
+    console.error(restaurantError);
+    return;
+  }
+
+  const { data: settings, error: settingsError } = await tapCartaSupabase
+    .from('restaurant_settings')
+    .select('active_languages, modules')
+    .eq('restaurant_id', id)
+    .maybeSingle();
+
+  if (settingsError) {
+    console.error('Erreur lecture restaurant_settings:', settingsError);
+  }
+
+  const { data: onboarding, error: onboardingError } = await tapCartaSupabase
+    .from('onboarding_assets')
+    .select(`
+      id,
+      logo_status,
+      menu_status,
+      translations_status,
+      legal_info_status,
+      gocardless_status,
+      translation_service_requested,
+      translation_fee,
+      notes
+    `)
+    .eq('restaurant_id', id)
+    .maybeSingle();
+
+  if (onboardingError) {
+    console.error('Erreur lecture onboarding_assets:', onboardingError);
+  }
+
+  const pack = getCommercialPackByCode(restaurant.pack_code || 'standard');
+
+  currentRestaurantData = normalizeRestaurantDataShape({
+    identity: {
+      id: restaurant.id || '',
+      name: restaurant.name || '',
+      plan: restaurant.pack_code || 'standard',
+      status: restaurant.status === 'rejected' || restaurant.status === 'suspended' ? 'inactive' : 'active',
+      languages: settings?.active_languages || ['fr', 'es', 'en', 'nl']
+    },
+    status: {
+      lifecycle: restaurant.status === 'rejected' || restaurant.status === 'suspended' ? 'inactive' : 'active'
+    },
+    languages: {
+      active: settings?.active_languages || ['fr', 'es', 'en', 'nl']
+    },
+    modules: settings?.modules || {
+      web: Boolean(pack?.includes_web),
+      ordering: Boolean(pack?.includes_ordering),
+      booking: Boolean(pack?.includes_booking),
+      preorderIndicative: false,
+      googleReviews: Boolean(pack?.includes_reviews),
+      whatsapp: true
+    },
+    links: {
+      slug: restaurant.slug || '',
+      publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || '')
+    },
+    billing: {
+      billingStatus: restaurant.status || '—'
+    },
+    onboarding: onboarding || {},
+    menu: {
+      categories: [],
+      menuVersion: 1,
+      updatedAt: ''
+    }
+  });
+
   currentRestaurantId = id;
   undoStack = [];
   resetUndoSource();
   fillForm(currentRestaurantData);
   resetDirtyState();
+
+  window.scrollTo({
+    top: document.querySelector('section.grid')?.offsetTop || 0,
+    behavior: 'smooth'
+  });
 }
 
-    async function loadRestaurantsIndex() {
-      const response = await fetch('./restaurants/index.json');
-      restaurantsIndex = await response.json();
+async function loadRestaurantsIndex() {
+  const select = document.getElementById('restaurant-select');
+  const status = document.getElementById('establishments-status');
+  const list = document.getElementById('establishments-list');
+  const filter = document.getElementById('establishments-filter');
+  const reloadBtn = document.getElementById('reload-establishments-btn');
 
-      const select = document.getElementById('restaurant-select');
-      select.innerHTML = restaurantsIndex.map(item => `
-        <option value="${item.id}">${item.name}</option>
-      `).join('');
+  if (!select) return;
 
-      if (restaurantsIndex.length) {
-        await loadRestaurantData(restaurantsIndex[0].id);
-      }
+  const { data: sessionData } = await tapCartaSupabase.auth.getSession();
 
-      select.addEventListener('change', async (e) => {
-        await loadRestaurantData(e.target.value);
-      });
+  if (!sessionData.session) {
+    select.innerHTML = '<option>Connexion requise</option>';
+
+    if (status) {
+      status.textContent = 'Connecte-toi pour afficher les établissements.';
     }
+
+    if (list) {
+      list.innerHTML = '';
+    }
+
+    return;
+  }
+
+  if (status) {
+    status.textContent = 'Chargement des établissements...';
+  }
+
+  const { data: restaurantsData, error: restaurantsError } = await tapCartaSupabase
+    .from('restaurants')
+    .select(`
+      id,
+      name,
+      slug,
+      status,
+      pack_code,
+      public_url,
+      resto_url,
+      activation_mode,
+      activation_reason,
+      system_activated_at,
+      validated_at,
+      created_at,
+      updated_at
+    `)
+    .order('name', { ascending: true });
+
+  if (restaurantsError) {
+    if (status) {
+      status.textContent = 'Erreur de lecture des établissements.';
+    }
+
+    select.innerHTML = '<option>Erreur Supabase</option>';
+    console.error(restaurantsError);
+    return;
+  }
+
+  const restaurantIds = (restaurantsData || []).map(restaurant => restaurant.id);
+
+  let onboardingData = [];
+
+  if (restaurantIds.length) {
+    const { data: onboardingResult, error: onboardingError } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .select(`
+        restaurant_id,
+        logo_status,
+        menu_status,
+        translations_status,
+        legal_info_status,
+        gocardless_status,
+        translation_service_requested,
+        translation_fee
+      `)
+      .in('restaurant_id', restaurantIds);
+
+    if (onboardingError) {
+      console.error('Erreur lecture onboarding établissements:', onboardingError);
+    } else {
+      onboardingData = onboardingResult || [];
+    }
+  }
+
+  restaurantsIndex = (restaurantsData || []).map(restaurant => {
+    const onboarding = onboardingData.find(item => item.restaurant_id === restaurant.id) || {};
+
+    return {
+      ...restaurant,
+      onboarding
+    };
+  });
+
+  select.innerHTML = restaurantsIndex.length
+    ? '<option value="">Sélectionner un établissement</option>' + restaurantsIndex.map(item => `
+        <option value="${item.id}">${item.name || 'Établissement sans nom'} — ${item.pack_code || 'pack inconnu'} — ${item.status || 'statut inconnu'}</option>
+      `).join('')
+    : '<option>Aucun établissement</option>';
+
+  if (!select.dataset.boundSupabaseRestaurants) {
+    select.addEventListener('change', async (e) => {
+      if (!e.target.value) return;
+      await loadRestaurantData(e.target.value);
+    });
+
+    select.dataset.boundSupabaseRestaurants = 'true';
+  }
+
+  if (filter && !filter.dataset.boundEstablishmentsFilter) {
+    filter.addEventListener('change', () => {
+      renderEstablishmentsList();
+    });
+
+    filter.dataset.boundEstablishmentsFilter = 'true';
+  }
+
+  if (reloadBtn && !reloadBtn.dataset.boundReloadEstablishments) {
+    reloadBtn.addEventListener('click', async () => {
+      await loadRestaurantsIndex();
+    });
+
+    reloadBtn.dataset.boundReloadEstablishments = 'true';
+  }
+
+  renderEstablishmentsList();
+
+  if (status) {
+    status.textContent = `${restaurantsIndex.length} établissement(s) chargé(s) depuis Supabase.`;
+  }
+}
+
+function renderEstablishmentsList() {
+  const list = document.getElementById('establishments-list');
+  const filter = document.getElementById('establishments-filter');
+
+  if (!list) return;
+
+  const selectedFilter = filter?.value || 'all';
+
+  const activationLabels = {
+    paid: 'Payant',
+    free_test: 'Test gratuit',
+    promo: 'Promo',
+    partner: 'Partenaire',
+    showcase: 'Vitrine',
+    manual: 'Manuel'
+  };
+
+  const statusLabels = {
+    lead: 'Lead',
+    join_requested: 'Demande reçue',
+    signed_pending_review: 'Signature à vérifier',
+    waiting_assets: 'Éléments attendus',
+    light_active: 'Light actif',
+    setup_in_progress: 'En création',
+    full_active: 'Actif',
+    suspended: 'Suspendu',
+    rejected: 'Refusé'
+  };
+
+  const filteredRestaurants = restaurantsIndex.filter(restaurant => {
+    if (selectedFilter === 'all') return true;
+
+    if (selectedFilter === 'active') {
+      return ['light_active', 'full_active'].includes(restaurant.status);
+    }
+
+    if (selectedFilter === 'setup') {
+      return ['setup_in_progress', 'waiting_assets', 'signed_pending_review', 'join_requested'].includes(restaurant.status);
+    }
+
+    if (selectedFilter === 'special') {
+      return ['free_test', 'promo', 'partner', 'showcase', 'manual'].includes(restaurant.activation_mode);
+    }
+
+    if (selectedFilter === 'suspended') {
+      return ['suspended', 'rejected'].includes(restaurant.status);
+    }
+
+    return restaurant.pack_code === selectedFilter;
+  });
+
+  if (!filteredRestaurants.length) {
+    list.innerHTML = `
+      <div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/55">
+        Aucun établissement dans ce filtre.
+      </div>
+    `;
+    return;
+  }
+
+  const getStatusClass = (status) => {
+    if (['full_active', 'light_active'].includes(status)) {
+      return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300';
+    }
+
+    if (['setup_in_progress', 'waiting_assets', 'signed_pending_review', 'join_requested'].includes(status)) {
+      return 'border-amber-400/30 bg-amber-500/10 text-amber-300';
+    }
+
+    if (['suspended', 'rejected'].includes(status)) {
+      return 'border-red-400/30 bg-red-500/10 text-red-300';
+    }
+
+    return 'border-white/10 bg-white/[0.03] text-cream/70';
+  };
+
+  const getOnboardingSummary = (onboarding) => {
+    const missing = [
+      onboarding?.menu_status === 'missing' || !onboarding?.menu_status ? 'menu' : '',
+      onboarding?.legal_info_status === 'missing' || !onboarding?.legal_info_status ? 'infos légales' : '',
+      onboarding?.gocardless_status && onboarding.gocardless_status !== 'validated' && onboarding.gocardless_status !== 'not_required'
+        ? 'GoCardless'
+        : ''
+    ].filter(Boolean);
+
+    return missing.length ? `Manque : ${missing.join(', ')}` : 'Dossier prêt / non bloquant';
+  };
+
+  list.innerHTML = filteredRestaurants.map(restaurant => {
+    const publicUrl = restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || '');
+    const restoUrl = restaurant.resto_url || '';
+    const activationLabel = restaurant.activation_mode
+      ? (activationLabels[restaurant.activation_mode] || restaurant.activation_mode)
+      : '—';
+
+    const gocardlessLabel = restaurant.onboarding?.gocardless_status || '—';
+
+    return `
+      <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="text-base font-bold text-gold">
+                ${restaurant.name || 'Établissement sans nom'}
+              </div>
+
+              <span class="rounded-full border ${getStatusClass(restaurant.status)} px-3 py-1 text-xs font-semibold">
+                ${statusLabels[restaurant.status] || restaurant.status || 'Statut inconnu'}
+              </span>
+
+              <span class="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-cream/70">
+                Pack : ${restaurant.pack_code || '—'}
+              </span>
+
+              <span class="rounded-full border border-gold/25 bg-gold/10 px-3 py-1 text-xs font-semibold text-gold">
+                Activation : ${activationLabel}
+              </span>
+            </div>
+
+            <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">GoCardless</div>
+                <div class="mt-1 text-sm font-semibold text-cream/82">${gocardlessLabel}</div>
+              </div>
+
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Onboarding</div>
+                <div class="mt-1 text-sm font-semibold text-cream/82">${getOnboardingSummary(restaurant.onboarding)}</div>
+              </div>
+
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Slug</div>
+                <div class="mt-1 break-words text-sm font-semibold text-cream/82">${restaurant.slug || '—'}</div>
+              </div>
+
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Activation système</div>
+                <div class="mt-1 text-sm font-semibold text-cream/82">
+                  ${restaurant.system_activated_at ? new Date(restaurant.system_activated_at).toLocaleDateString('fr-FR') : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2 xl:items-end">
+            <button
+              type="button"
+              data-action="load-establishment"
+              data-restaurant-id="${restaurant.id}"
+              class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+            >
+              Charger dans Admin
+            </button>
+
+            ${
+              publicUrl
+                ? `
+                  <a
+                    href="${publicUrl}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-sm font-semibold text-cream/80"
+                  >
+                    Page publique
+                  </a>
+                `
+                : ''
+            }
+
+            ${
+              restoUrl
+                ? `
+                  <a
+                    href="${restoUrl}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-sm font-semibold text-cream/80"
+                  >
+                    Ouvrir Resto
+                  </a>
+                `
+                : ''
+            }
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-action="load-establishment"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await loadRestaurantData(button.dataset.restaurantId);
+    });
+  });
+
+  if (window.lucide) lucide.createIcons();
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initializeSaasAdmin();
-  await loadRestaurantsIndex();
   bindFormEvents();
   bindUndoTracking();
 
