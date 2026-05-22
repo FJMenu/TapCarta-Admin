@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.4.3';
+  const APP_VERSION = 'V1.3.4.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -946,6 +946,22 @@ async function loadJoinRequests() {
                       ✓ Traité
                     </div>
 
+                    ${
+                      activationMode && activationMode !== 'paid'
+                        ? `
+                          <button
+                            type="button"
+                            data-action="cancel-special-activation"
+                            data-restaurant-id="${request.restaurant_id}"
+                            data-request-id="${request.id}"
+                            class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
+                          >
+                            Annuler activation spéciale
+                          </button>
+                        `
+                        : ''
+                    }
+
                     <button
                       type="button"
                       data-action="archive-test-request"
@@ -1062,6 +1078,18 @@ async function loadJoinRequests() {
         button.dataset.restaurantId,
         button.dataset.requestId,
         button.dataset.selectedOffer,
+        request
+      );
+    });
+  });
+
+  list.querySelectorAll('[data-action="cancel-special-activation"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const request = data.find(item => item.id === button.dataset.requestId);
+
+      await cancelSpecialActivation(
+        button.dataset.restaurantId,
+        button.dataset.requestId,
         request
       );
     });
@@ -1347,6 +1375,101 @@ async function activateJoinRequestWithoutPayment(restaurantId, requestId, select
   }
 
   alert('Restaurant activé sans GoCardless. Aucun paiement n’a été marqué comme validé.');
+
+  await loadJoinRequests();
+}
+
+async function cancelSpecialActivation(restaurantId, requestId, request) {
+  if (!restaurantId || !requestId) return;
+
+  const activationMode = request?.restaurants?.activation_mode || '';
+
+  if (!activationMode || activationMode === 'paid') {
+    alert('Annulation impossible : cette demande n’est pas une activation spéciale.');
+    return;
+  }
+
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Annuler cette activation spéciale ?',
+    message: 'Le restaurant reviendra en demande à traiter. Le paiement GoCardless restera non validé. Cette action sert uniquement à corriger un test, une vitrine, une promo ou une activation manuelle.',
+    confirmLabel: 'Annuler l’activation spéciale',
+    cancelLabel: 'Conserver',
+    danger: true
+  });
+
+  if (!confirmed) return;
+
+  const doubleConfirmed = await showTapCartaConfirmModal({
+    title: 'Confirmation finale',
+    message: 'Dernière vérification : le restaurant ne sera plus considéré comme activé dans le système.',
+    confirmLabel: 'Oui, revenir en arrière',
+    cancelLabel: 'Annuler',
+    danger: true
+  });
+
+  if (!doubleConfirmed) return;
+
+  const { error: restaurantError } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      status: 'join_requested',
+      activation_mode: null,
+      activation_reason: null,
+      system_activated_at: null,
+      validated_at: null
+    })
+    .eq('id', restaurantId);
+
+  if (restaurantError) {
+    alert('Erreur annulation activation restaurant.');
+    console.error(restaurantError);
+    return;
+  }
+
+  const { data: existingOnboarding, error: existingOnboardingError } = await tapCartaSupabase
+    .from('onboarding_assets')
+    .select('id, notes')
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle();
+
+  if (existingOnboardingError) {
+    alert('Activation annulée côté restaurant, mais erreur lecture onboarding.');
+    console.error(existingOnboardingError);
+    return;
+  }
+
+  if (existingOnboarding?.id) {
+    const previousNotes = existingOnboarding.notes ? `${existingOnboarding.notes}\n\n` : '';
+
+    const { error: onboardingError } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .update({
+        gocardless_status: 'not_started',
+        notes: `${previousNotes}[Annulation activation spéciale] Retour en demande à traiter.`
+      })
+      .eq('id', existingOnboarding.id);
+
+    if (onboardingError) {
+      alert('Activation annulée côté restaurant, mais erreur mise à jour onboarding.');
+      console.error(onboardingError);
+      return;
+    }
+  }
+
+  const { error: requestError } = await tapCartaSupabase
+    .from('join_requests')
+    .update({
+      status: 'pending_review'
+    })
+    .eq('id', requestId);
+
+  if (requestError) {
+    alert('Activation annulée côté restaurant, mais erreur statut demande.');
+    console.error(requestError);
+    return;
+  }
+
+  alert('Activation spéciale annulée. La demande revient à traiter.');
 
   await loadJoinRequests();
 }
