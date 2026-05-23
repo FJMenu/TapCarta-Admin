@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.5.5';
+  const APP_VERSION = 'V1.3.5.6';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -759,17 +759,22 @@ function updateJoinRequestsAutoRefresh() {
   tapCartaJoinRequestsRefreshTimer = setInterval(async () => {
     if (tapCartaIsRefreshingJoinRequests) return;
 
-    // Sécurité : ne jamais rafraîchir pendant qu’un humain travaille dans l’Admin
+    // Le refresh automatique ne concerne que "Demandes reçues".
+    // Il ne doit jamais recharger la fiche établissement, l'onboarding,
+    // le suivi du dossier, les modules ou la facturation.
     if (isTapCartaUserWorking()) return;
 
     tapCartaIsRefreshingJoinRequests = true;
 
     try {
-      await loadJoinRequests();
+      await loadJoinRequests({
+        silent: true,
+        preserveCurrentRestaurant: true
+      });
     } finally {
       tapCartaIsRefreshingJoinRequests = false;
     }
-  }, 45000);
+  }, 300000);
 }
 
 function stopJoinRequestsAutoRefresh() {
@@ -778,12 +783,19 @@ function stopJoinRequestsAutoRefresh() {
     tapCartaJoinRequestsRefreshTimer = null;
   }
 }
-async function loadJoinRequests() {
+async function loadJoinRequests(options = {}) {
+  const {
+    silent = false,
+    preserveCurrentRestaurant = false
+  } = options;
+
   const status = document.getElementById('join-requests-status');
   const list = document.getElementById('join-requests-list');
 
-  status.textContent = 'Chargement des demandes...';
-  list.innerHTML = '';
+  if (!silent) {
+    status.textContent = 'Chargement des demandes...';
+    list.innerHTML = '';
+  }
 
   const { data, error } = await tapCartaSupabase
     .from('join_requests')
@@ -829,7 +841,9 @@ async function loadJoinRequests() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    status.textContent = 'Erreur de lecture des demandes.';
+    if (!silent) {
+      status.textContent = 'Erreur de lecture des demandes.';
+    }
     console.error(error);
     return;
   }
@@ -837,6 +851,11 @@ async function loadJoinRequests() {
   if (!data.length) {
     status.textContent = 'Aucune demande reçue.';
     updatePendingContractAlert(0);
+
+    if (!silent) {
+      list.innerHTML = '';
+    }
+
     return;
   }
 
