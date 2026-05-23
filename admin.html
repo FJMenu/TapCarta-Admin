@@ -2588,6 +2588,7 @@ function setWorkflowStepState(stepNumber, state = 'pending') {
   const stateClasses = {
     done: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300',
     pending: 'border-amber-400/30 bg-amber-500/10 text-amber-300',
+    authorized: 'border-cyan-400/35 bg-cyan-500/10 text-cyan-300',
     blocked: 'border-red-400/35 bg-red-500/10 text-red-300'
   };
 
@@ -2635,10 +2636,11 @@ function renderWorkflowProgress(data = {}) {
 
   if (
     paymentStatus === 'validated' ||
-    paymentStatus === 'not_required' ||
-    paymentStatus === 'authorized_pending'
+    paymentStatus === 'not_required'
   ) {
     states[5] = 'done';
+  } else if (paymentStatus === 'authorized_pending') {
+    states[5] = 'authorized';
   } else if (paymentStatus === 'failed' || paymentStatus === 'problem') {
     states[5] = 'blocked';
   }
@@ -2673,20 +2675,40 @@ function renderWorkflowProgress(data = {}) {
 
   const firstBlockedStep = Object.entries(states).find(([, state]) => state === 'blocked');
   const firstPendingStep = Object.entries(states).find(([, state]) => state === 'pending');
-  const currentStepNumber = firstBlockedStep?.[0] || firstPendingStep?.[0] || '9';
-  const currentState = firstBlockedStep ? 'blocked' : firstPendingStep ? 'pending' : 'done';
+  const firstAuthorizedStep = Object.entries(states).find(([, state]) => state === 'authorized');
+
+  const currentStepNumber =
+    firstBlockedStep?.[0] ||
+    firstPendingStep?.[0] ||
+    firstAuthorizedStep?.[0] ||
+    '9';
+
+  const currentState =
+    firstBlockedStep
+      ? 'blocked'
+      : firstPendingStep
+        ? 'pending'
+        : firstAuthorizedStep
+          ? 'authorized'
+          : 'done';
 
   const currentStep = document.getElementById('workflow-current-step');
   const currentAction = document.getElementById('workflow-current-action');
 
   if (currentStep) {
-    currentStep.textContent = `${currentStepNumber}/9 — ${WORKFLOW_STEP_LABELS[currentStepNumber] || 'Suivi du dossier'}`;
+    const stepLabel =
+      currentState === 'authorized' && currentStepNumber === '5'
+        ? 'Paiement autorisé provisoirement'
+        : WORKFLOW_STEP_LABELS[currentStepNumber] || 'Suivi du dossier';
+
+    currentStep.textContent = `${currentStepNumber}/9 — ${stepLabel}`;
   }
 
   if (currentAction) {
     const actionLabels = {
       done: 'Dossier terminé ou prêt selon les informations actuellement disponibles.',
       pending: 'Étape en attente ou à compléter.',
+      authorized: 'Poursuite autorisée manuellement, paiement non finalisé.',
       blocked: 'Étape bloquante : action nécessaire avant de continuer.'
     };
 
