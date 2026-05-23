@@ -387,6 +387,20 @@
                 <div class="text-xs uppercase tracking-wide text-cream/45 mb-1">Statut facturation</div>
                 <div id="billing-status" class="text-sm font-semibold text-cream">—</div>
               </div>
+
+              <div class="rounded-xl border border-gold/18 bg-black/15 px-4 py-3">
+                <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">
+                  Date d’activation commerciale prévue
+                </label>
+                <input
+                  id="planned-commercial-activation-date"
+                  type="date"
+                  class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+                >
+                <p class="mt-2 text-xs leading-relaxed text-cream/45">
+                  Référence contractuelle : période commerciale, échéances et résiliation. Modifiable manuellement par Admin.
+                </p>
+              </div>
             </div>
           </article>
 </section>
@@ -2412,6 +2426,10 @@ function normalizeRestaurantDataShape(data) {
     data.billing.billingStatus = 'active';
   }
 
+  if (typeof data.billing.plannedCommercialActivationDate !== 'string') {
+    data.billing.plannedCommercialActivationDate = '';
+  }
+
   return data;
 }
 
@@ -2512,6 +2530,7 @@ function applyEditMode() {
     document.getElementById('field-languages'),
     document.getElementById('field-slug'),
     document.getElementById('field-public-page'),
+    document.getElementById('planned-commercial-activation-date'),
 
     document.getElementById('onboarding-logo-status'),
     document.getElementById('onboarding-menu-status'),
@@ -2910,6 +2929,11 @@ function fillForm(data) {
       document.getElementById('billing-total').textContent = formatPrice(data.billing.monthlyTotal || 0);
       document.getElementById('billing-status').textContent = data.billing.billingStatus || '—';
 
+      const plannedCommercialActivationDateField = document.getElementById('planned-commercial-activation-date');
+      if (plannedCommercialActivationDateField) {
+        plannedCommercialActivationDateField.value = data.billing.plannedCommercialActivationDate || '';
+      }
+
       document.getElementById('onboarding-logo-status').value = data.onboarding.logo_status || 'missing';
       document.getElementById('onboarding-menu-status').value = data.onboarding.menu_status || 'missing';
       document.getElementById('onboarding-translations-status').value = data.onboarding.translations_status || 'missing';
@@ -2948,7 +2972,8 @@ function fillForm(data) {
   const packCode = currentRestaurantData.identity?.plan || 'standard';
   const restaurantSlug = normalizeTapCartaSlug(currentRestaurantData.links?.slug || '');
   const publicUrl = currentRestaurantData.links?.publicPage || buildTapCartaPublicUrl(restaurantSlug);
-
+  const plannedCommercialActivationDate =
+    currentRestaurantData.billing?.plannedCommercialActivationDate || null;
   const activeLanguages = Array.isArray(currentRestaurantData.languages?.active)
     ? currentRestaurantData.languages.active
     : [];
@@ -2962,6 +2987,7 @@ function fillForm(data) {
       slug: restaurantSlug,
       pack_code: packCode,
       public_url: publicUrl,
+      planned_commercial_activation_date: plannedCommercialActivationDate,
       updated_at: new Date().toISOString()
     })
     .eq('id', currentRestaurantId);
@@ -3226,7 +3252,19 @@ function bindFormEvents() {
     currentRestaurantData.links.publicPage = e.target.value.trim();
     markDirty();
   });
+  const plannedCommercialActivationDateField = document.getElementById('planned-commercial-activation-date');
+  if (plannedCommercialActivationDateField) {
+    plannedCommercialActivationDateField.addEventListener('change', (e) => {
+      if (!currentRestaurantData) return;
 
+      if (!currentRestaurantData.billing || typeof currentRestaurantData.billing !== 'object') {
+        currentRestaurantData.billing = {};
+      }
+
+      currentRestaurantData.billing.plannedCommercialActivationDate = e.target.value || '';
+      markDirty();
+    });
+  }
   const bindOnboardingField = (fieldId, key, type = 'value') => {
     const field = document.getElementById(fieldId);
     if (!field) return;
@@ -3450,6 +3488,7 @@ async function loadRestaurantData(id) {
       activation_reason,
       system_activated_at,
       validated_at,
+      planned_commercial_activation_date,
       created_at,
       updated_at
     `)
@@ -3573,7 +3612,8 @@ async function loadRestaurantData(id) {
       publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || '')
     },
     billing: {
-      billingStatus: restaurant.status || '—'
+      billingStatus: restaurant.status || '—',
+      plannedCommercialActivationDate: restaurant.planned_commercial_activation_date || ''
     },
     onboarding: onboarding || {},
     contract: {
@@ -3660,6 +3700,7 @@ async function loadRestaurantsIndex() {
       activation_reason,
       system_activated_at,
       validated_at,
+      planned_commercial_activation_date,
       created_at,
       updated_at
     `)
