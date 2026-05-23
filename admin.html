@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.7';
+  const APP_VERSION = 'V1.3.6.8';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -495,6 +495,17 @@
           <option value="downloaded">QR téléchargé</option>
           <option value="manual_validated">Validé manuellement</option>
           <option value="blocked_contact_required">Bloquant — contact requis</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Page finale</label>
+        <select id="onboarding-page-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="not_started">Non commencée</option>
+          <option value="in_progress">En préparation</option>
+          <option value="ready_for_review">À relire / vérifier</option>
+          <option value="validated">Validée / prête</option>
+          <option value="blocked">Bloquant page</option>
         </select>
       </div>
 
@@ -2192,6 +2203,7 @@ function normalizeRestaurantDataShape(data) {
     legal_info_status: data.onboarding.legal_info_status || 'missing',
     gocardless_status: data.onboarding.gocardless_status || 'not_started',
     qr_status: data.onboarding.qr_status || 'not_prepared',
+    page_status: data.onboarding.page_status || 'not_started',
     translation_service_requested: Boolean(data.onboarding.translation_service_requested),
     translation_fee: Number(data.onboarding.translation_fee || 0),
     notes: data.onboarding.notes || ''
@@ -2729,8 +2741,17 @@ function renderWorkflowProgress(data = {}) {
     states[7] = 'authorized';
   }
 
-  if (workflow.page_ready_for_review) {
+  const pageStatus = onboarding.page_status || 'not_started';
+
+  if (pageStatus === 'validated' || workflow.page_ready_for_review) {
     states[8] = 'done';
+  } else if (
+    pageStatus === 'in_progress' ||
+    pageStatus === 'ready_for_review'
+  ) {
+    states[8] = 'authorized';
+  } else if (pageStatus === 'blocked') {
+    states[8] = 'blocked';
   }
 
   if (restaurantStatus === 'full_active' || restaurantStatus === 'light_active') {
@@ -2821,6 +2842,7 @@ function fillForm(data) {
       document.getElementById('onboarding-legal-status').value = data.onboarding.legal_info_status || 'missing';
       document.getElementById('onboarding-gocardless-status').value = data.onboarding.gocardless_status || 'not_started';
       document.getElementById('onboarding-qr-status').value = data.onboarding.qr_status || 'not_prepared';
+      document.getElementById('onboarding-page-status').value = data.onboarding.page_status || 'not_started';
       document.getElementById('onboarding-translation-requested').checked = Boolean(data.onboarding.translation_service_requested);
       document.getElementById('onboarding-translation-fee').value = Number(data.onboarding.translation_fee || 0);
       document.getElementById('onboarding-notes').value = data.onboarding.notes || '';
@@ -2904,6 +2926,7 @@ function fillForm(data) {
     legal_info_status: onboarding.legal_info_status || 'missing',
     gocardless_status: onboarding.gocardless_status || 'not_started',
     qr_status: onboarding.qr_status || 'not_prepared',
+    page_status: onboarding.page_status || 'not_started',
     translation_service_requested: Boolean(onboarding.translation_service_requested),
     translation_fee: Number(onboarding.translation_fee || 0),
     notes: onboarding.notes || '',
@@ -3159,6 +3182,7 @@ function bindFormEvents() {
   bindOnboardingField('onboarding-legal-status', 'legal_info_status');
   bindOnboardingField('onboarding-gocardless-status', 'gocardless_status');
   bindOnboardingField('onboarding-qr-status', 'qr_status');
+  bindOnboardingField('onboarding-page-status', 'page_status');
   bindOnboardingField('onboarding-translation-requested', 'translation_service_requested', 'checkbox');
   bindOnboardingField('onboarding-translation-fee', 'translation_fee', 'number');
   bindOnboardingField('onboarding-notes', 'notes');
@@ -3243,6 +3267,7 @@ async function loadRestaurantData(id) {
       legal_info_status,
       gocardless_status,
       qr_status,
+      page_status,
       translation_service_requested,
       translation_fee,
       notes
@@ -3449,6 +3474,7 @@ async function loadRestaurantsIndex() {
         legal_info_status,
         gocardless_status,
         qr_status,
+        page_status,
         translation_service_requested,
         translation_fee
       `)
