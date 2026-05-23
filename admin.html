@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.7.6';
+  const APP_VERSION = 'V1.3.7.7';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -2352,6 +2352,7 @@ function renderContractBillingBlock(contract) {
   const normalizedContract = normalizeContractData(contract);
 
   const statusClasses = {
+    draft: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-300',
     generated: 'border-cyan-400/30 bg-cyan-500/10 text-cyan-300',
     sent: 'border-amber-400/30 bg-amber-500/10 text-amber-300',
     pending_signature: 'border-amber-400/30 bg-amber-500/10 text-amber-300',
@@ -3821,9 +3822,38 @@ async function loadRestaurantData(id) {
     .from('contracts')
     .select(`
       id,
+      restaurant_id,
+      join_request_id,
+      contract_number,
+      contract_version,
+      language_displayed,
+      official_language,
       status,
+      signed_at,
+      signed_email,
+      pdf_url,
+      pdf_storage_path,
+      pdf_generated_at,
+      pdf_sent_at,
+      planned_commercial_activation_date,
+      pack_code,
+      monthly_price,
+      currency,
+      signer_name,
+      company_name,
+      signer_role,
+      signature_language,
+      accepted_contract,
+      accepted_authority,
+      accepted_payment,
+      payment_status,
+      payment_provider,
+      signature_source,
+      activation_mode,
       metadata,
-      created_at
+      contract_type,
+      created_at,
+      updated_at
     `)
     .eq('restaurant_id', id)
     .order('created_at', { ascending: false })
