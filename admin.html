@@ -816,14 +816,6 @@ async function loadJoinRequests(options = {}) {
       legal_name,
       tax_number,
       billing_email,
-      company_legal_name,
-      company_tax_id,
-      contracting_name,
-      customer_type,
-      personal_tax_id,
-      signer_name,
-      signer_role,
-      signer_tax_id,
       selected_offer,
       needs,
       languages_requested,
@@ -3117,6 +3109,36 @@ async function loadRestaurantData(id) {
     console.error('Erreur lecture join_request liée:', linkedJoinRequestError);
   }
 
+  const { data: latestContract, error: latestContractError } = await tapCartaSupabase
+    .from('contracts')
+    .select(`
+      id,
+      status,
+      metadata,
+      created_at
+    `)
+    .eq('restaurant_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestContractError) {
+    console.error('Erreur lecture contrat lié:', latestContractError);
+  }
+
+  const signedContractStatuses = [
+    'signed_pending_activation',
+    'signed_pending_payment',
+    'payment_pending',
+    'active',
+    'signed'
+  ];
+
+  const hasSignedContract =
+    signedContractStatuses.includes(latestContract?.status) ||
+    Boolean(latestContract?.metadata?.signed_at) ||
+    latestContract?.metadata?.accepted_contract === true;
+
   const pack = getCommercialPackByCode(restaurant.pack_code || 'standard');
 
   currentRestaurantData = normalizeRestaurantDataShape({
@@ -3149,6 +3171,12 @@ async function loadRestaurantData(id) {
       billingStatus: restaurant.status || '—'
     },
     onboarding: onboarding || {},
+    contract: {
+      id: latestContract?.id || '',
+      status: latestContract?.status || '',
+      signed_at: latestContract?.metadata?.signed_at || '',
+      created_at: latestContract?.created_at || ''
+    },
     workflow: {
       join_request_id: linkedJoinRequest?.id || '',
       join_request_status: linkedJoinRequest?.status || '',
@@ -3160,7 +3188,10 @@ async function loadRestaurantData(id) {
       restaurant_status: restaurant.status || '',
       restaurant_validated_at: restaurant.validated_at || '',
       system_activated_at: restaurant.system_activated_at || '',
-      contract_signed: false,
+      contract_signed: hasSignedContract,
+      contract_id: latestContract?.id || '',
+      contract_status: latestContract?.status || '',
+      contract_signed_at: latestContract?.metadata?.signed_at || '',
       qr_received: false,
       qr_blocked: false,
       page_ready_for_review: false
