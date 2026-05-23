@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.2';
+  const APP_VERSION = 'V1.3.6.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -782,6 +782,21 @@ function stopJoinRequestsAutoRefresh() {
     clearInterval(tapCartaJoinRequestsRefreshTimer);
     tapCartaJoinRequestsRefreshTimer = null;
   }
+}
+
+function scrollToRestaurantDetails() {
+  const target = document.getElementById('restaurant-details-section');
+  const stickyHeader = document.querySelector('main > header');
+
+  if (!target) return;
+
+  const headerOffset = stickyHeader ? stickyHeader.offsetHeight + 18 : 90;
+  const targetTop = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+
+  window.scrollTo({
+    top: Math.max(targetTop, 0),
+    behavior: 'smooth'
+  });
 }
 async function loadJoinRequests(options = {}) {
   const {
@@ -1930,10 +1945,7 @@ async function loadJoinRequestIntoAdmin(request) {
   fillForm(currentRestaurantData);
   resetDirtyState();
 
-  window.scrollTo({
-    top: document.querySelector('section.grid')?.offsetTop || 0,
-    behavior: 'smooth'
-  });
+  scrollToRestaurantDetails();
 }
 async function loadCommercialPacks() {
   const status = document.getElementById('commercial-packs-status');
@@ -3259,10 +3271,7 @@ async function loadRestaurantData(id) {
   fillForm(currentRestaurantData);
   resetDirtyState();
 
-  window.scrollTo({
-    top: document.querySelector('section.grid')?.offsetTop || 0,
-    behavior: 'smooth'
-  });
+  scrollToRestaurantDetails();
 }
 
 async function loadRestaurantsIndex() {
