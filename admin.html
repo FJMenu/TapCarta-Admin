@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.6';
+  const APP_VERSION = 'V1.3.6.7';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -2685,13 +2685,48 @@ function renderWorkflowProgress(data = {}) {
     states[6] = 'blocked';
   }
 
-  const clientElementsReady =
-    onboarding.menu_status !== 'missing' &&
-    onboarding.logo_status !== 'missing' &&
-    onboarding.legal_info_status !== 'missing';
+  const logoStatus = onboarding.logo_status || 'missing';
+  const menuStatus = onboarding.menu_status || 'missing';
+  const translationStatus = onboarding.translations_status || 'missing';
+  const translationRequested = Boolean(onboarding.translation_service_requested);
 
-  if (clientElementsReady) {
+  const logoValidated = logoStatus === 'validated';
+  const menuValidated = menuStatus === 'validated';
+
+  const logoReceivedOrValidated =
+    logoStatus === 'received' ||
+    logoStatus === 'validated';
+
+  const menuReceivedOrValidated =
+    menuStatus === 'received' ||
+    menuStatus === 'validated';
+
+  const translationDoneOrNotRequired =
+    !translationRequested ||
+    translationStatus === 'done';
+
+  const translationInProgress =
+    translationRequested &&
+    [
+      'requested',
+      'payment_sent',
+      'paid'
+    ].includes(translationStatus);
+
+  const clientElementsValidated =
+    logoValidated &&
+    menuValidated &&
+    translationDoneOrNotRequired;
+
+  const clientElementsInProgress =
+    logoReceivedOrValidated ||
+    menuReceivedOrValidated ||
+    translationInProgress;
+
+  if (clientElementsValidated) {
     states[7] = 'done';
+  } else if (clientElementsInProgress) {
+    states[7] = 'authorized';
   }
 
   if (workflow.page_ready_for_review) {
