@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.4';
+  const APP_VERSION = 'V1.3.6.5';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -429,7 +429,7 @@
       </div>
 
       <div class="mt-3 text-xs text-cream/55">
-        Orange = en attente / en cours · Vert = fait · Rouge = bloquant
+        Orange = en attente / en cours · Cyan = autorisé / prêt provisoire · Vert = fait · Rouge = bloquant
       </div>
     </div>
 
@@ -481,6 +481,20 @@
           <option value="validated">Validé manuellement</option>
           <option value="not_required">Non requis</option>
           <option value="problem">Problème paiement</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">QR / accès Resto</label>
+        <select id="onboarding-qr-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="not_prepared">Non préparé</option>
+          <option value="waiting_page_online">Page d’attente en ligne</option>
+          <option value="qr_email_sent">Mail QR envoyé</option>
+          <option value="reminder_1_sent">Rappel 1 envoyé</option>
+          <option value="reminder_2_sent">Rappel 2 envoyé</option>
+          <option value="downloaded">QR téléchargé</option>
+          <option value="manual_validated">Validé manuellement</option>
+          <option value="blocked_contact_required">Bloquant — contact requis</option>
         </select>
       </div>
 
@@ -2177,6 +2191,7 @@ function normalizeRestaurantDataShape(data) {
     translations_status: data.onboarding.translations_status || 'missing',
     legal_info_status: data.onboarding.legal_info_status || 'missing',
     gocardless_status: data.onboarding.gocardless_status || 'not_started',
+    qr_status: data.onboarding.qr_status || 'not_prepared',
     translation_service_requested: Boolean(data.onboarding.translation_service_requested),
     translation_fee: Number(data.onboarding.translation_fee || 0),
     notes: data.onboarding.notes || ''
@@ -2645,9 +2660,28 @@ function renderWorkflowProgress(data = {}) {
     states[5] = 'blocked';
   }
 
-  if (workflow.qr_received) {
+  const qrStatus = onboarding.qr_status || 'not_prepared';
+
+  if (
+    qrStatus === 'downloaded' ||
+    qrStatus === 'manual_validated' ||
+    workflow.qr_received
+  ) {
     states[6] = 'done';
-  } else if (workflow.qr_blocked) {
+  } else if (
+    qrStatus === 'waiting_page_online' ||
+    qrStatus === 'qr_email_sent'
+  ) {
+    states[6] = 'authorized';
+  } else if (
+    qrStatus === 'reminder_1_sent' ||
+    qrStatus === 'reminder_2_sent'
+  ) {
+    states[6] = 'pending';
+  } else if (
+    qrStatus === 'blocked_contact_required' ||
+    workflow.qr_blocked
+  ) {
     states[6] = 'blocked';
   }
 
@@ -2751,6 +2785,7 @@ function fillForm(data) {
       document.getElementById('onboarding-translations-status').value = data.onboarding.translations_status || 'missing';
       document.getElementById('onboarding-legal-status').value = data.onboarding.legal_info_status || 'missing';
       document.getElementById('onboarding-gocardless-status').value = data.onboarding.gocardless_status || 'not_started';
+      document.getElementById('onboarding-qr-status').value = data.onboarding.qr_status || 'not_prepared';
       document.getElementById('onboarding-translation-requested').checked = Boolean(data.onboarding.translation_service_requested);
       document.getElementById('onboarding-translation-fee').value = Number(data.onboarding.translation_fee || 0);
       document.getElementById('onboarding-notes').value = data.onboarding.notes || '';
@@ -2833,6 +2868,7 @@ function fillForm(data) {
     photos_status: 'missing',
     legal_info_status: onboarding.legal_info_status || 'missing',
     gocardless_status: onboarding.gocardless_status || 'not_started',
+    qr_status: onboarding.qr_status || 'not_prepared',
     translation_service_requested: Boolean(onboarding.translation_service_requested),
     translation_fee: Number(onboarding.translation_fee || 0),
     notes: onboarding.notes || '',
@@ -3086,6 +3122,7 @@ function bindFormEvents() {
   bindOnboardingField('onboarding-translations-status', 'translations_status');
   bindOnboardingField('onboarding-legal-status', 'legal_info_status');
   bindOnboardingField('onboarding-gocardless-status', 'gocardless_status');
+  bindOnboardingField('onboarding-qr-status', 'qr_status');
   bindOnboardingField('onboarding-translation-requested', 'translation_service_requested', 'checkbox');
   bindOnboardingField('onboarding-translation-fee', 'translation_fee', 'number');
   bindOnboardingField('onboarding-notes', 'notes');
@@ -3169,6 +3206,7 @@ async function loadRestaurantData(id) {
       translations_status,
       legal_info_status,
       gocardless_status,
+      qr_status,
       translation_service_requested,
       translation_fee,
       notes
@@ -3374,6 +3412,7 @@ async function loadRestaurantsIndex() {
         translations_status,
         legal_info_status,
         gocardless_status,
+        qr_status,
         translation_service_requested,
         translation_fee
       `)
