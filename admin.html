@@ -3405,6 +3405,8 @@ async function confirmRestaurantActiveManually() {
   await loadRestaurantsIndex();
   await loadJoinRequests();
 }
+
+async function loadRestaurantData(id) {
   if (!id) return;
 
   const { data: restaurant, error: restaurantError } = await tapCartaSupabase
