@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.9';
+  const APP_VERSION = 'V1.3.7.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -2501,11 +2501,14 @@ function applyEditMode() {
     document.getElementById('field-languages'),
     document.getElementById('field-slug'),
     document.getElementById('field-public-page'),
+
     document.getElementById('onboarding-logo-status'),
     document.getElementById('onboarding-menu-status'),
     document.getElementById('onboarding-translations-status'),
     document.getElementById('onboarding-legal-status'),
     document.getElementById('onboarding-gocardless-status'),
+    document.getElementById('onboarding-qr-status'),
+    document.getElementById('onboarding-page-status'),
     document.getElementById('onboarding-translation-requested'),
     document.getElementById('onboarding-translation-fee'),
     document.getElementById('onboarding-notes')
@@ -2520,6 +2523,18 @@ function applyEditMode() {
     checkbox.disabled = !editMode;
   });
 
+  const finalActionButtons = [
+    document.getElementById('final-checking-btn'),
+    document.getElementById('final-confirm-active-btn'),
+    document.getElementById('final-block-btn')
+  ];
+
+  finalActionButtons.forEach((button) => {
+    if (!button) return;
+    button.disabled = !editMode;
+    button.classList.toggle('opacity-50', !editMode);
+    button.classList.toggle('cursor-not-allowed', !editMode);
+  });
 }
 
 function undoLastChange() {
