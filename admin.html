@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.3';
+  const APP_VERSION = 'V1.3.6.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -473,13 +473,15 @@
       </div>
 
       <div>
-        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Paiement</label>
-      <select id="onboarding-gocardless-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
-  <option value="not_started">Non commencé</option>
-  <option value="pending">En attente</option>
-  <option value="validated">Validé</option>
-  <option value="not_required">Non requis</option>
-</select>
+        <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Paiement / autorisation</label>
+        <select id="onboarding-gocardless-status" class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none">
+          <option value="not_started">Non traité</option>
+          <option value="pending">En attente</option>
+          <option value="authorized_pending">En attente autorisée</option>
+          <option value="validated">Validé manuellement</option>
+          <option value="not_required">Non requis</option>
+          <option value="problem">Problème paiement</option>
+        </select>
       </div>
 
       <div class="rounded-xl border border-white/10 bg-black/15 px-4 py-3">
@@ -2631,7 +2633,11 @@ function renderWorkflowProgress(data = {}) {
 
   const paymentStatus = onboarding.gocardless_status || 'not_started';
 
-  if (paymentStatus === 'validated' || paymentStatus === 'not_required') {
+  if (
+    paymentStatus === 'validated' ||
+    paymentStatus === 'not_required' ||
+    paymentStatus === 'authorized_pending'
+  ) {
     states[5] = 'done';
   } else if (paymentStatus === 'failed' || paymentStatus === 'problem') {
     states[5] = 'blocked';
@@ -3485,7 +3491,8 @@ function renderEstablishmentsList() {
     const missing = [
       onboarding?.menu_status === 'missing' || !onboarding?.menu_status ? 'menu' : '',
       onboarding?.legal_info_status === 'missing' || !onboarding?.legal_info_status ? 'infos légales' : '',
-      onboarding?.gocardless_status && onboarding.gocardless_status !== 'validated' && onboarding.gocardless_status !== 'not_required'
+      onboarding?.gocardless_status &&
+      !['validated', 'not_required', 'authorized_pending'].includes(onboarding.gocardless_status)
         ? 'Paiement'
         : ''
     ].filter(Boolean);
