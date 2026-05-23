@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.6.1';
+  const APP_VERSION = 'V1.3.6.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1811,6 +1811,7 @@ async function loadJoinRequestIntoAdmin(request) {
   currentRestaurantId = request.restaurant_id;
 
   let onboardingData = null;
+  let latestContract = null;
 
   if (currentRestaurantId) {
     const { data: onboardingResult, error: onboardingError } = await tapCartaSupabase
@@ -1834,7 +1835,39 @@ async function loadJoinRequestIntoAdmin(request) {
     }
 
     onboardingData = onboardingResult || null;
+
+    const { data: latestContractResult, error: latestContractError } = await tapCartaSupabase
+      .from('contracts')
+      .select(`
+        id,
+        status,
+        metadata,
+        created_at
+      `)
+      .eq('restaurant_id', currentRestaurantId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestContractError) {
+      console.error('Erreur lecture contrat lié:', latestContractError);
+    }
+
+    latestContract = latestContractResult || null;
   }
+
+  const signedContractStatuses = [
+    'signed_pending_activation',
+    'signed_pending_payment',
+    'payment_pending',
+    'active',
+    'signed'
+  ];
+
+  const hasSignedContract =
+    signedContractStatuses.includes(latestContract?.status) ||
+    Boolean(latestContract?.metadata?.signed_at) ||
+    latestContract?.metadata?.accepted_contract === true;
 
   currentRestaurantData = normalizeRestaurantDataShape({
     identity: {
@@ -1866,6 +1899,12 @@ async function loadJoinRequestIntoAdmin(request) {
       billingStatus: restaurant.status || 'join_requested'
     },
     onboarding: onboardingData || {},
+    contract: {
+      id: latestContract?.id || '',
+      status: latestContract?.status || '',
+      signed_at: latestContract?.metadata?.signed_at || '',
+      created_at: latestContract?.created_at || ''
+    },
     workflow: {
       join_request_status: request.status || '',
       email_confirmed: Boolean(request.email_confirmed),
@@ -1873,7 +1912,10 @@ async function loadJoinRequestIntoAdmin(request) {
       restaurant_status: restaurant.status || '',
       restaurant_validated_at: restaurant.validated_at || '',
       system_activated_at: restaurant.system_activated_at || '',
-      contract_signed: false,
+      contract_signed: hasSignedContract,
+      contract_id: latestContract?.id || '',
+      contract_status: latestContract?.status || '',
+      contract_signed_at: latestContract?.metadata?.signed_at || '',
       qr_received: false,
       qr_blocked: false,
       page_ready_for_review: false
