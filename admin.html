@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V1.3.7.7';
+  const APP_VERSION = 'V2.1.1.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1998,6 +1998,10 @@ async function loadJoinRequestIntoAdmin(request) {
         activation_mode,
         metadata,
         contract_type,
+        pdf_status,
+        pdf_generation_method,
+        pdf_generation_provider,
+        pdf_generation_error,
         created_at,
         updated_at
       `)
@@ -2307,6 +2311,10 @@ function normalizeContractData(contract) {
       signer_name: '',
       company_name: '',
       signer_role: '',
+      pdf_status: '',
+      pdf_generation_method: '',
+      pdf_generation_provider: '',
+      pdf_generation_error: '',
       metadata: {}
     };
   }
@@ -2339,10 +2347,13 @@ function normalizeContractData(contract) {
     signer_name: contract.signer_name || '',
     company_name: contract.company_name || '',
     signer_role: contract.signer_role || '',
+    pdf_status: contract.pdf_status || '',
+    pdf_generation_method: contract.pdf_generation_method || '',
+    pdf_generation_provider: contract.pdf_generation_provider || '',
+    pdf_generation_error: contract.pdf_generation_error || '',
     metadata
   };
 }
-
 function renderContractBillingBlock(contract) {
   const badge = document.getElementById('contract-status-badge');
   const summary = document.getElementById('contract-summary');
@@ -2401,6 +2412,19 @@ function renderContractBillingBlock(contract) {
     `
     : '';
 
+  const pdfStatusLabel = normalizedContract.pdf_status || '—';
+
+  const pdfErrorBlock = normalizedContract.pdf_generation_error
+    ? `
+      <div class="rounded-xl border border-red-400/25 bg-red-500/10 px-3 py-3">
+        <div class="text-[10px] uppercase tracking-wide text-red-300/80">Erreur génération PDF</div>
+        <div class="mt-1 break-words text-xs font-semibold text-red-100/85">
+          ${escapeTapCartaHtml(normalizedContract.pdf_generation_error)}
+        </div>
+      </div>
+    `
+    : '';
+
   summary.innerHTML = `
     <div class="grid gap-3 md:grid-cols-2">
       <div class="rounded-xl border border-white/8 bg-black/20 px-3 py-3">
@@ -2428,6 +2452,13 @@ function renderContractBillingBlock(contract) {
         <div class="text-[10px] uppercase tracking-wide text-cream/40">Langue affichée / signature</div>
         <div class="mt-1 text-sm font-semibold text-cream/82">
           ${escapeTapCartaHtml(normalizedContract.language_displayed || normalizedContract.signature_language || '—')}
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+        <div class="text-[10px] uppercase tracking-wide text-cream/40">Statut PDF</div>
+        <div class="mt-1 text-sm font-semibold text-cream/82">
+          ${escapeTapCartaHtml(pdfStatusLabel)}
         </div>
       </div>
 
@@ -2467,9 +2498,162 @@ function renderContractBillingBlock(contract) {
       </div>
       ${pdfUrlBlock}
     </div>
+
+    ${pdfErrorBlock}
+
+    <button
+      type="button"
+      data-action="generate-contract-pdf"
+      data-contract-id="${escapeTapCartaHtml(normalizedContract.id)}"
+      class="w-full rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold hover:bg-gold/15"
+    >
+      Générer / régénérer le PDF contrat
+    </button>
   `;
+
+  const generatePdfButton = summary.querySelector('[data-action="generate-contract-pdf"]');
+
+  if (generatePdfButton) {
+    generatePdfButton.addEventListener('click', async () => {
+      await generateContractPdfFromAdmin(normalizedContract.id);
+    });
+  }
 }
 
+async function generateContractPdfFromAdmin(contractId) {
+  if (!contractId) {
+    alert('Aucun contrat sélectionné.');
+    return;
+  }
+
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Générer le PDF contrat ?',
+    message: 'Cette action appelle Supabase, génère le PDF via DocuGenerate, l’upload dans contract-pdfs et met à jour la ligne contracts.',
+    confirmLabel: 'Générer le PDF',
+    cancelLabel: 'Annuler'
+  });
+
+  if (!confirmed) return;
+
+  const button = document.querySelector('[data-action="generate-contract-pdf"]');
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Génération en cours...';
+    button.classList.add('opacity-60');
+  }
+
+  try {
+    const { data: sessionData } = await tapCartaSupabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token;
+
+    if (!accessToken) {
+      alert('Session admin introuvable. Déconnecte-toi puis reconnecte-toi.');
+      return;
+    }
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-contract-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        contractId: contractId
+      })
+    });
+
+    const responseText = await response.text();
+
+    let result = null;
+
+    try {
+      result = responseText ? JSON.parse(responseText) : null;
+    } catch (_error) {
+      result = null;
+    }
+
+    if (!response.ok || !result?.success) {
+      console.error('Erreur génération PDF contrat:', response.status, responseText);
+      alert(
+        result?.error
+          ? `Erreur génération PDF : ${result.error}`
+          : `Erreur génération PDF. HTTP ${response.status}`
+      );
+      return;
+    }
+
+    const { data: freshContract, error: freshContractError } = await tapCartaSupabase
+      .from('contracts')
+      .select(`
+        id,
+        restaurant_id,
+        join_request_id,
+        contract_number,
+        contract_version,
+        language_displayed,
+        official_language,
+        status,
+        signed_at,
+        signed_email,
+        pdf_url,
+        pdf_storage_path,
+        pdf_generated_at,
+        pdf_sent_at,
+        planned_commercial_activation_date,
+        pack_code,
+        monthly_price,
+        currency,
+        signer_name,
+        company_name,
+        signer_role,
+        signature_language,
+        accepted_contract,
+        accepted_authority,
+        accepted_payment,
+        payment_status,
+        payment_provider,
+        signature_source,
+        activation_mode,
+        metadata,
+        contract_type,
+        pdf_status,
+        pdf_generation_method,
+        pdf_generation_provider,
+        pdf_generation_error,
+        created_at,
+        updated_at
+      `)
+      .eq('id', contractId)
+      .maybeSingle();
+
+    if (freshContractError) {
+      console.error('PDF généré, mais erreur relecture contrat:', freshContractError);
+      alert('PDF généré, mais la relecture Admin a échoué. Recharge la fiche.');
+      return;
+    }
+
+    if (currentRestaurantData) {
+      currentRestaurantData.contract = normalizeContractData(freshContract || result.contract);
+    }
+
+    renderContractBillingBlock(freshContract || result.contract);
+
+    alert('PDF contrat généré et relié au contrat.');
+
+  } catch (error) {
+    console.error('Erreur génération PDF contrat:', error);
+    alert('Erreur génération PDF contrat. Voir console.');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Générer / régénérer le PDF contrat';
+      button.classList.remove('opacity-60');
+    }
+  }
+}
+
+function normalizeTapCartaSlug(value) {
 function normalizeTapCartaSlug(value) {
   return (value || '')
     .toString()
