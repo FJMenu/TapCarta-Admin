@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.1.1.1';
+  const APP_VERSION = 'V2.1.2.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -264,6 +264,41 @@
   </div>
 
   <div id="establishments-list" class="space-y-3"></div>
+</section>
+
+<section
+  id="contracts-section"
+  class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6"
+>
+  <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h3 class="font-display text-xl font-bold text-cream">Contrats</h3>
+      <p class="text-sm text-cream/60 mt-1">
+        Accès rapide aux contrats PDF — recherche alphabétique par restaurant
+      </p>
+    </div>
+
+    <button
+      id="reload-contracts-btn"
+      type="button"
+      class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+    >
+      Recharger contrats
+    </button>
+  </div>
+
+  <input
+    id="contracts-search"
+    type="search"
+    class="mb-4 w-full rounded-xl border border-gold/25 bg-black/20 px-4 py-3 text-sm text-cream outline-none"
+    placeholder="Rechercher un restaurant ou une référence contrat..."
+  >
+
+  <div id="contracts-status" class="mb-3 text-sm text-cream/60">
+    Connecte-toi pour afficher les contrats.
+  </div>
+
+  <div id="contracts-list" class="space-y-3"></div>
 </section>
 
 <section class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
@@ -667,6 +702,7 @@ const tapCartaSupabase = supabase.createClient(
 let adminLanguage = 'fr';
 let commercialPacks = [];
 let restaurantsIndex = [];
+let contractsIndex = [];
 let currentRestaurantId = null;
 let currentRestaurantData = null;
 let undoStack = [];
@@ -793,6 +829,9 @@ async function initializeSaasAdmin() {
     await loadJoinRequests();
     await loadCommercialPacks();
     await loadRestaurantsIndex();
+    await loadContractsIndex();
+    await loadContractsIndex();
+    await loadContractsIndex();
   }
 }
 
@@ -4193,6 +4232,306 @@ async function loadRestaurantData(id) {
   scrollToRestaurantDetails();
 }
 
+async function loadContractsIndex() {
+  const status = document.getElementById('contracts-status');
+  const list = document.getElementById('contracts-list');
+  const search = document.getElementById('contracts-search');
+  const reloadBtn = document.getElementById('reload-contracts-btn');
+
+  if (!status || !list) return;
+
+  const { data: sessionData } = await tapCartaSupabase.auth.getSession();
+
+  if (!sessionData.session) {
+    status.textContent = 'Connecte-toi pour afficher les contrats.';
+    list.innerHTML = '';
+    return;
+  }
+
+  status.textContent = 'Chargement des contrats...';
+
+  const { data: contractsData, error: contractsError } = await tapCartaSupabase
+    .from('contracts')
+    .select(`
+      id,
+      restaurant_id,
+      contract_number,
+      contract_version,
+      status,
+      official_language,
+      language_displayed,
+      signed_at,
+      pdf_storage_path,
+      pdf_generated_at,
+      pdf_sent_at,
+      pdf_status,
+      planned_commercial_activation_date,
+      pack_code,
+      monthly_price,
+      company_name,
+      signer_name,
+      metadata,
+      created_at,
+      updated_at
+    `)
+    .order('created_at', { ascending: false });
+
+  if (contractsError) {
+    status.textContent = 'Erreur de lecture des contrats.';
+    list.innerHTML = '';
+    console.error(contractsError);
+    return;
+  }
+
+  const restaurantIds = [...new Set((contractsData || []).map(contract => contract.restaurant_id).filter(Boolean))];
+
+  let restaurantsMap = new Map();
+
+  if (restaurantIds.length) {
+    const { data: restaurantsData, error: restaurantsError } = await tapCartaSupabase
+      .from('restaurants')
+      .select('id, name, slug, public_url, pack_code, status')
+      .in('id', restaurantIds);
+
+    if (restaurantsError) {
+      console.error('Erreur lecture restaurants pour contrats:', restaurantsError);
+    } else {
+      restaurantsMap = new Map((restaurantsData || []).map(restaurant => [restaurant.id, restaurant]));
+    }
+  }
+
+  const latestByRestaurant = new Map();
+
+  (contractsData || []).forEach(contract => {
+    const key = contract.restaurant_id || contract.id;
+
+    if (!latestByRestaurant.has(key)) {
+      latestByRestaurant.set(key, contract);
+    }
+  });
+
+  contractsIndex = [...latestByRestaurant.values()]
+    .map(contract => {
+      const restaurant = restaurantsMap.get(contract.restaurant_id) || {};
+      const metadata = contract.metadata && typeof contract.metadata === 'object'
+        ? contract.metadata
+        : {};
+
+      const restaurantName =
+        restaurant.name ||
+        metadata.restaurant_trade_name ||
+        metadata.restaurant_name ||
+        contract.company_name ||
+        'Restaurant sans nom';
+
+      return {
+        ...contract,
+        restaurant_name: restaurantName,
+        restaurant_slug: restaurant.slug || metadata.restaurant_slug || '',
+        restaurant_public_url: restaurant.public_url || '',
+        restaurant_pack_code: restaurant.pack_code || contract.pack_code || '',
+        restaurant_status: restaurant.status || ''
+      };
+    })
+    .sort((a, b) => {
+      return String(a.restaurant_name || '').localeCompare(String(b.restaurant_name || ''), 'fr', {
+        sensitivity: 'base'
+      });
+    });
+
+  if (search && !search.dataset.boundContractsSearch) {
+    search.addEventListener('input', () => {
+      renderContractsIndex();
+    });
+
+    search.dataset.boundContractsSearch = 'true';
+  }
+
+  if (reloadBtn && !reloadBtn.dataset.boundContractsReload) {
+    reloadBtn.addEventListener('click', async () => {
+      await loadContractsIndex();
+    });
+
+    reloadBtn.dataset.boundContractsReload = 'true';
+  }
+
+  renderContractsIndex();
+
+  status.textContent = `${contractsIndex.length} contrat(s) chargé(s).`;
+}
+
+function renderContractsIndex() {
+  const list = document.getElementById('contracts-list');
+  const search = document.getElementById('contracts-search');
+
+  if (!list) return;
+
+  const query = (search?.value || '').trim().toLowerCase();
+
+  const filteredContracts = contractsIndex.filter(contract => {
+    const searchable = [
+      contract.restaurant_name,
+      contract.contract_number,
+      contract.company_name,
+      contract.signer_name,
+      contract.pdf_storage_path,
+      contract.status,
+      contract.pdf_status
+    ].join(' ').toLowerCase();
+
+    return !query || searchable.includes(query);
+  });
+
+  if (!filteredContracts.length) {
+    list.innerHTML = `
+      <div class="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-cream/55">
+        Aucun contrat trouvé.
+      </div>
+    `;
+    return;
+  }
+
+  const statusClass = (status) => {
+    if (['signed', 'active', 'signed_pending_activation'].includes(status)) {
+      return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300';
+    }
+
+    if (['draft', 'generated', 'sent', 'pending_signature'].includes(status)) {
+      return 'border-amber-400/30 bg-amber-500/10 text-amber-300';
+    }
+
+    if (['cancelled'].includes(status)) {
+      return 'border-red-400/30 bg-red-500/10 text-red-300';
+    }
+
+    return 'border-white/10 bg-white/[0.03] text-cream/70';
+  };
+
+  const pdfStatusClass = (pdfStatus) => {
+    if (['generated', 'manual_uploaded'].includes(pdfStatus)) {
+      return 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300';
+    }
+
+    if (['generating', 'not_generated'].includes(pdfStatus)) {
+      return 'border-amber-400/30 bg-amber-500/10 text-amber-300';
+    }
+
+    if (['failed'].includes(pdfStatus)) {
+      return 'border-red-400/30 bg-red-500/10 text-red-300';
+    }
+
+    return 'border-white/10 bg-white/[0.03] text-cream/70';
+  };
+
+  list.innerHTML = filteredContracts.map(contract => {
+    const hasPdf = Boolean(contract.pdf_storage_path);
+
+    return `
+      <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="text-base font-bold text-gold">
+                ${escapeTapCartaHtml(contract.restaurant_name || 'Restaurant sans nom')}
+              </div>
+
+              <span class="rounded-full border ${statusClass(contract.status)} px-3 py-1 text-xs font-semibold">
+                ${escapeTapCartaHtml(contract.status || '—')}
+              </span>
+
+              <span class="rounded-full border ${pdfStatusClass(contract.pdf_status)} px-3 py-1 text-xs font-semibold">
+                PDF : ${escapeTapCartaHtml(contract.pdf_status || '—')}
+              </span>
+            </div>
+
+            <div class="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Référence</div>
+                <div class="mt-1 break-words text-sm font-semibold text-cream/82">
+                  ${escapeTapCartaHtml(contract.contract_number || '—')}
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Signature</div>
+                <div class="mt-1 text-sm font-semibold text-cream/82">
+                  ${formatTapCartaDateTime(contract.signed_at)}
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">PDF généré</div>
+                <div class="mt-1 text-sm font-semibold text-cream/82">
+                  ${formatTapCartaDateTime(contract.pdf_generated_at)}
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-white/8 bg-black/15 px-3 py-2">
+                <div class="text-[10px] uppercase tracking-wide text-cream/40">Activation commerciale</div>
+                <div class="mt-1 text-sm font-semibold text-cream/82">
+                  ${formatTapCartaDate(contract.planned_commercial_activation_date)}
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-2 break-words text-xs text-cream/45">
+              ${hasPdf ? escapeTapCartaHtml(contract.pdf_storage_path) : 'Aucun PDF stocké'}
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2 xl:w-[180px]">
+            ${
+              hasPdf
+                ? `
+                  <button
+                    type="button"
+                    data-action="open-contract-pdf-index"
+                    data-pdf-path="${escapeTapCartaHtml(contract.pdf_storage_path)}"
+                    class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300"
+                  >
+                    Lire le PDF
+                  </button>
+                `
+                : `
+                  <button
+                    type="button"
+                    disabled
+                    class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/35"
+                  >
+                    Aucun PDF
+                  </button>
+                `
+            }
+
+            <button
+              type="button"
+              data-action="load-contract-restaurant"
+              data-restaurant-id="${escapeTapCartaHtml(contract.restaurant_id || '')}"
+              class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+            >
+              Charger resto
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-action="open-contract-pdf-index"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await openContractPdfFromAdmin(button.dataset.pdfPath);
+    });
+  });
+
+  list.querySelectorAll('[data-action="load-contract-restaurant"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      if (!button.dataset.restaurantId) return;
+      await loadRestaurantData(button.dataset.restaurantId);
+      scrollToRestaurantDetails();
+    });
+  });
+}
+
 async function loadRestaurantsIndex() {
   const select = document.getElementById('restaurant-select');
   const status = document.getElementById('establishments-status');
@@ -4568,10 +4907,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const navBillingBtn = document.getElementById('nav-billing-btn');
   if (navBillingBtn) {
-    navBillingBtn.addEventListener('click', () => {
-      document.getElementById('billing-section')?.scrollIntoView({
+    navBillingBtn.addEventListener('click', async () => {
+      await loadContractsIndex();
+
+      document.getElementById('contracts-section')?.scrollIntoView({
         behavior: 'smooth',
-        block: 'center'
+        block: 'start'
       });
     });
   }
