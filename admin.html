@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.2.1';
+  const APP_VERSION = 'V2.2.2.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -3870,71 +3870,112 @@ function renderWorkflowProgress(data = {}) {
 }
 
 function fillForm(data) {
-      const lifecycleStatus =
-        data.status?.lifecycle ||
-        data.identity?.status ||
-        'active';
+  const lifecycleStatus =
+    data.status?.lifecycle ||
+    data.identity?.status ||
+    'active';
 
-      const activeLanguages = Array.isArray(data.languages?.active)
-        ? data.languages.active
-        : (Array.isArray(data.identity?.languages) ? data.identity.languages : []);
+  const activeLanguages = Array.isArray(data.languages?.active)
+    ? data.languages.active
+    : (Array.isArray(data.identity?.languages) ? data.identity.languages : []);
 
-      document.getElementById('field-name').value = data.identity.name || '';
-      document.getElementById('field-status').value = lifecycleStatus;
-      document.getElementById('field-plan').value = data.identity.plan || 'standard';
-      document.getElementById('field-languages').value = activeLanguages.join(', ');
-      document.getElementById('field-slug').value = data.links?.slug || '';
-      document.getElementById('field-public-page').value =
-        data.links?.publicPage ||
-        data.links?.clientMenuUrl ||
-        data.technical?.clientMenuUrl ||
-        '';
+  document.getElementById('field-name').value = data.identity.name || '';
+  document.getElementById('field-status').value = lifecycleStatus;
+  document.getElementById('field-plan').value = data.identity.plan || 'standard';
+  document.getElementById('field-languages').value = activeLanguages.join(', ');
+  document.getElementById('field-slug').value = data.links?.slug || '';
 
-      renderModules(data.modules);
-      renderRestaurantRestoAccessPanel();
-      recalculateBilling();
+  document.getElementById('field-public-page').value =
+    data.links?.publicPage ||
+    data.links?.clientMenuUrl ||
+    data.technical?.clientMenuUrl ||
+    '';
 
-      document.getElementById('billing-plan-price').textContent = formatPrice(data.billing.planPrice || 0);
-      document.getElementById('billing-options-price').textContent =
-        `${(data.billing.orderingBookingOption || 0) + (data.billing.extraLanguages || 0) + (data.billing.webOption || 0)} € / mois`;
-      document.getElementById('billing-total').textContent = formatPrice(data.billing.monthlyTotal || 0);
-      document.getElementById('billing-status').textContent = data.billing.billingStatus || '—';
+  const logoUrlField = document.getElementById('field-logo-url');
+  const logoPreview = document.getElementById('field-logo-preview');
+  const logoEmpty = document.getElementById('field-logo-empty');
 
-      const plannedCommercialActivationDateField = document.getElementById('planned-commercial-activation-date');
-      if (plannedCommercialActivationDateField) {
-        plannedCommercialActivationDateField.value = data.billing.plannedCommercialActivationDate || '';
-      }
+  if (logoUrlField) {
+    logoUrlField.value = data.links?.logoUrl || '';
+  }
 
-      renderContractBillingBlock(data.contract);
-
-      document.getElementById('onboarding-logo-status').value = data.onboarding.logo_status || 'missing';
-      document.getElementById('onboarding-menu-status').value = data.onboarding.menu_status || 'missing';
-      document.getElementById('onboarding-translations-status').value = data.onboarding.translations_status || 'missing';
-      document.getElementById('onboarding-legal-status').value = data.onboarding.legal_info_status || 'missing';
-      document.getElementById('onboarding-gocardless-status').value = data.onboarding.gocardless_status || 'not_started';
-      document.getElementById('onboarding-qr-status').value = data.onboarding.qr_status || 'not_prepared';
-      document.getElementById('onboarding-page-status').value = data.onboarding.page_status || 'not_started';
-      document.getElementById('onboarding-translation-requested').checked = Boolean(data.onboarding.translation_service_requested);
-      document.getElementById('onboarding-translation-fee').value = Number(data.onboarding.translation_fee || 0);
-      document.getElementById('onboarding-notes').value = data.onboarding.notes || '';
-
-      const onboardingSummary = document.getElementById('onboarding-summary');
-      if (onboardingSummary) {
-        const missingItems = [
-          data.onboarding.menu_status === 'missing' ? 'menu' : '',
-          data.onboarding.legal_info_status === 'missing' ? 'infos légales' : '',
-          data.onboarding.gocardless_status !== 'validated' ? 'paiement' : ''
-        ].filter(Boolean);
-
-        onboardingSummary.textContent = missingItems.length
-          ? `Manque : ${missingItems.join(', ')}`
-          : 'Dossier prêt';
-      }
-
-      renderWorkflowProgress(data);
-
-      if (window.lucide) lucide.createIcons();
+  if (logoPreview && logoEmpty) {
+    if (data.links?.logoUrl) {
+      logoPreview.src = data.links.logoUrl;
+      logoPreview.classList.remove('hidden');
+      logoEmpty.classList.add('hidden');
+    } else {
+      logoPreview.src = '';
+      logoPreview.classList.add('hidden');
+      logoEmpty.classList.remove('hidden');
     }
+  }
+
+  const googleReviewsField = document.getElementById('field-google-reviews-url');
+  if (googleReviewsField) {
+    googleReviewsField.value = data.links?.googleReviewsUrl || '';
+  }
+
+  const googleMapsField = document.getElementById('field-google-maps-url');
+  if (googleMapsField) {
+    googleMapsField.value = data.links?.googleMapsUrl || '';
+  }
+
+  const publicPageStatusField = document.getElementById('field-public-page-status');
+  if (publicPageStatusField) {
+    publicPageStatusField.value = data.publication?.publicPageStatus || 'waiting_page';
+  }
+
+  const menuPublicationStatusField = document.getElementById('field-menu-publication-status');
+  if (menuPublicationStatusField) {
+    menuPublicationStatusField.value = data.publication?.menuPublicationStatus || 'not_started';
+  }
+
+  renderModules(data.modules);
+  renderRestaurantRestoAccessPanel();
+  recalculateBilling();
+
+  document.getElementById('billing-plan-price').textContent = formatPrice(data.billing.planPrice || 0);
+  document.getElementById('billing-options-price').textContent =
+    `${(data.billing.orderingBookingOption || 0) + (data.billing.extraLanguages || 0) + (data.billing.webOption || 0)} € / mois`;
+  document.getElementById('billing-total').textContent = formatPrice(data.billing.monthlyTotal || 0);
+  document.getElementById('billing-status').textContent = data.billing.billingStatus || '—';
+
+  const plannedCommercialActivationDateField = document.getElementById('planned-commercial-activation-date');
+  if (plannedCommercialActivationDateField) {
+    plannedCommercialActivationDateField.value = data.billing.plannedCommercialActivationDate || '';
+  }
+
+  renderContractBillingBlock(data.contract);
+
+  document.getElementById('onboarding-logo-status').value = data.onboarding.logo_status || 'missing';
+  document.getElementById('onboarding-menu-status').value = data.onboarding.menu_status || 'missing';
+  document.getElementById('onboarding-translations-status').value = data.onboarding.translations_status || 'missing';
+  document.getElementById('onboarding-legal-status').value = data.onboarding.legal_info_status || 'missing';
+  document.getElementById('onboarding-gocardless-status').value = data.onboarding.gocardless_status || 'not_started';
+  document.getElementById('onboarding-qr-status').value = data.onboarding.qr_status || 'not_prepared';
+  document.getElementById('onboarding-page-status').value = data.onboarding.page_status || 'not_started';
+  document.getElementById('onboarding-translation-requested').checked = Boolean(data.onboarding.translation_service_requested);
+  document.getElementById('onboarding-translation-fee').value = Number(data.onboarding.translation_fee || 0);
+  document.getElementById('onboarding-notes').value = data.onboarding.notes || '';
+
+  const onboardingSummary = document.getElementById('onboarding-summary');
+  if (onboardingSummary) {
+    const missingItems = [
+      data.onboarding.menu_status === 'missing' ? 'menu' : '',
+      data.onboarding.legal_info_status === 'missing' ? 'infos légales' : '',
+      data.onboarding.gocardless_status !== 'validated' ? 'paiement' : ''
+    ].filter(Boolean);
+
+    onboardingSummary.textContent = missingItems.length
+      ? `Manque : ${missingItems.join(', ')}`
+      : 'Dossier prêt';
+  }
+
+  renderWorkflowProgress(data);
+
+  if (window.lucide) lucide.createIcons();
+}
     async function saveCurrentRestaurantToSupabase() {
   if (!currentRestaurantData || !currentRestaurantId) {
     alert('Aucun restaurant chargé.');
@@ -4457,6 +4498,14 @@ async function loadRestaurantData(id) {
       pack_code,
       public_url,
       resto_url,
+      logo_storage_path,
+      logo_url,
+      google_reviews_url,
+      google_maps_url,
+      public_page_status,
+      menu_publication_status,
+      menu_validated_at,
+      menu_published_at,
       activation_mode,
       activation_reason,
       system_activated_at,
@@ -4629,13 +4678,23 @@ async function loadRestaurantData(id) {
       googleReviews: Boolean(pack?.includes_reviews),
       whatsapp: true
     },
-links: {
-  slug: restaurant.slug || '',
-  publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || ''),
-  restoUrl: restaurant.resto_url || ''
-},
-restoAccess: restoAccess || null,
-billing: {
+    links: {
+      slug: restaurant.slug || '',
+      publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || ''),
+      restoUrl: restaurant.resto_url || '',
+      logoStoragePath: restaurant.logo_storage_path || '',
+      logoUrl: restaurant.logo_url || '',
+      googleReviewsUrl: restaurant.google_reviews_url || '',
+      googleMapsUrl: restaurant.google_maps_url || ''
+    },
+    publication: {
+      publicPageStatus: restaurant.public_page_status || 'waiting_page',
+      menuPublicationStatus: restaurant.menu_publication_status || 'not_started',
+      menuValidatedAt: restaurant.menu_validated_at || '',
+      menuPublishedAt: restaurant.menu_published_at || ''
+    },
+    restoAccess: restoAccess || null,
+    billing: {
       billingStatus: restaurant.status || '—',
       plannedCommercialActivationDate: restaurant.planned_commercial_activation_date || ''
     },
