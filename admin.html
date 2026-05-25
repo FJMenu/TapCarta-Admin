@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.2.2';
+  const APP_VERSION = 'V2.2.2.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -3500,6 +3500,11 @@ function applyEditMode() {
     document.getElementById('field-languages'),
     document.getElementById('field-slug'),
     document.getElementById('field-public-page'),
+    document.getElementById('field-logo-url'),
+    document.getElementById('field-google-reviews-url'),
+    document.getElementById('field-google-maps-url'),
+    document.getElementById('field-public-page-status'),
+    document.getElementById('field-menu-publication-status'),
     document.getElementById('planned-commercial-activation-date'),
 
     document.getElementById('onboarding-logo-status'),
@@ -3988,6 +3993,13 @@ function fillForm(data) {
   const publicUrl = currentRestaurantData.links?.publicPage || buildTapCartaPublicUrl(restaurantSlug);
   const plannedCommercialActivationDate =
     currentRestaurantData.billing?.plannedCommercialActivationDate || null;
+
+  const logoUrl = currentRestaurantData.links?.logoUrl || null;
+  const googleReviewsUrl = currentRestaurantData.links?.googleReviewsUrl || null;
+  const googleMapsUrl = currentRestaurantData.links?.googleMapsUrl || null;
+  const publicPageStatus = currentRestaurantData.publication?.publicPageStatus || 'waiting_page';
+  const menuPublicationStatus = currentRestaurantData.publication?.menuPublicationStatus || 'not_started';
+
   const activeLanguages = Array.isArray(currentRestaurantData.languages?.active)
     ? currentRestaurantData.languages.active
     : [];
@@ -4001,6 +4013,11 @@ function fillForm(data) {
       slug: restaurantSlug,
       pack_code: packCode,
       public_url: publicUrl,
+      logo_url: logoUrl,
+      google_reviews_url: googleReviewsUrl,
+      google_maps_url: googleMapsUrl,
+      public_page_status: publicPageStatus,
+      menu_publication_status: menuPublicationStatus,
       planned_commercial_activation_date: plannedCommercialActivationDate,
       updated_at: new Date().toISOString()
     })
@@ -4266,6 +4283,178 @@ function bindFormEvents() {
     currentRestaurantData.links.publicPage = e.target.value.trim();
     markDirty();
   });
+
+  const logoUrlField = document.getElementById('field-logo-url');
+  if (logoUrlField) {
+    logoUrlField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.logoUrl = e.target.value.trim();
+
+      const logoPreview = document.getElementById('field-logo-preview');
+      const logoEmpty = document.getElementById('field-logo-empty');
+
+      if (logoPreview && logoEmpty) {
+        if (currentRestaurantData.links.logoUrl) {
+          logoPreview.src = currentRestaurantData.links.logoUrl;
+          logoPreview.classList.remove('hidden');
+          logoEmpty.classList.add('hidden');
+        } else {
+          logoPreview.src = '';
+          logoPreview.classList.add('hidden');
+          logoEmpty.classList.remove('hidden');
+        }
+      }
+
+      markDirty();
+    });
+  }
+
+  const googleReviewsField = document.getElementById('field-google-reviews-url');
+  if (googleReviewsField) {
+    googleReviewsField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.googleReviewsUrl = e.target.value.trim();
+      markDirty();
+    });
+  }
+
+  const googleMapsField = document.getElementById('field-google-maps-url');
+  if (googleMapsField) {
+    googleMapsField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.googleMapsUrl = e.target.value.trim();
+      markDirty();
+    });
+  }
+
+  const publicPageStatusField = document.getElementById('field-public-page-status');
+  if (publicPageStatusField) {
+    publicPageStatusField.addEventListener('change', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.publication || typeof currentRestaurantData.publication !== 'object') {
+        currentRestaurantData.publication = {};
+      }
+
+      currentRestaurantData.publication.publicPageStatus = e.target.value;
+      markDirty();
+    });
+  }
+
+  const menuPublicationStatusField = document.getElementById('field-menu-publication-status');
+  if (menuPublicationStatusField) {
+    menuPublicationStatusField.addEventListener('change', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.publication || typeof currentRestaurantData.publication !== 'object') {
+        currentRestaurantData.publication = {};
+      }
+
+      currentRestaurantData.publication.menuPublicationStatus = e.target.value;
+      markDirty();
+    });
+  }
+
+  const logoUrlField = document.getElementById('field-logo-url');
+  if (logoUrlField) {
+    logoUrlField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.logoUrl = e.target.value.trim();
+
+      const logoPreview = document.getElementById('field-logo-preview');
+      const logoEmpty = document.getElementById('field-logo-empty');
+
+      if (logoPreview && logoEmpty) {
+        if (currentRestaurantData.links.logoUrl) {
+          logoPreview.src = currentRestaurantData.links.logoUrl;
+          logoPreview.classList.remove('hidden');
+          logoEmpty.classList.add('hidden');
+        } else {
+          logoPreview.src = '';
+          logoPreview.classList.add('hidden');
+          logoEmpty.classList.remove('hidden');
+        }
+      }
+
+      markDirty();
+    });
+  }
+
+  const googleReviewsField = document.getElementById('field-google-reviews-url');
+  if (googleReviewsField) {
+    googleReviewsField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.googleReviewsUrl = e.target.value.trim();
+      markDirty();
+    });
+  }
+
+  const googleMapsField = document.getElementById('field-google-maps-url');
+  if (googleMapsField) {
+    googleMapsField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.googleMapsUrl = e.target.value.trim();
+      markDirty();
+    });
+  }
+
+  const publicPageStatusField = document.getElementById('field-public-page-status');
+  if (publicPageStatusField) {
+    publicPageStatusField.addEventListener('change', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.publication || typeof currentRestaurantData.publication !== 'object') {
+        currentRestaurantData.publication = {};
+      }
+
+      currentRestaurantData.publication.publicPageStatus = e.target.value;
+      markDirty();
+    });
+  }
+
+  const menuPublicationStatusField = document.getElementById('field-menu-publication-status');
+  if (menuPublicationStatusField) {
+    menuPublicationStatusField.addEventListener('change', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.publication || typeof currentRestaurantData.publication !== 'object') {
+        currentRestaurantData.publication = {};
+      }
+
+      currentRestaurantData.publication.menuPublicationStatus = e.target.value;
+      markDirty();
+    });
+  }
   const plannedCommercialActivationDateField = document.getElementById('planned-commercial-activation-date');
   if (plannedCommercialActivationDateField) {
     plannedCommercialActivationDateField.addEventListener('change', (e) => {
