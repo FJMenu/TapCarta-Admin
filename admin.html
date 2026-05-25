@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.1.2';
+  const APP_VERSION = 'V2.2.2.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -373,6 +373,84 @@
     class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
     placeholder="https://tapcarta.com/la-sarten-manilva/"
   >
+</div>
+
+<div class="rounded-2xl border border-gold/18 bg-black/15 px-4 py-4">
+  <div class="text-xs uppercase tracking-wide text-gold/80 font-bold">
+    Logo officiel
+  </div>
+
+  <div class="mt-3 flex items-center gap-4">
+    <div class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/25">
+      <img
+        id="field-logo-preview"
+        src=""
+        alt="Logo restaurant"
+        class="hidden h-full w-full object-contain"
+      >
+      <span id="field-logo-empty" class="text-xs text-cream/40">Aucun</span>
+    </div>
+
+    <div class="min-w-0 flex-1">
+      <input
+        id="field-logo-url"
+        type="text"
+        class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+        placeholder="URL générée après upload Supabase Storage"
+      >
+      <p class="mt-2 text-xs text-cream/45">
+        Le logo officiel sera uploadé par Admin. Resto ne pourra pas le modifier.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Lien avis Google</label>
+  <input
+    id="field-google-reviews-url"
+    type="url"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+    placeholder="https://g.page/r/..."
+  >
+</div>
+
+<div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Lien Google Maps / GPS</label>
+  <input
+    id="field-google-maps-url"
+    type="url"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+    placeholder="https://maps.google.com/..."
+  >
+</div>
+
+<div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Statut page publique</label>
+  <select
+    id="field-public-page-status"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+  >
+    <option value="waiting_page">Page d’attente</option>
+    <option value="ready_for_review">Prête à vérifier</option>
+    <option value="live">Menu live</option>
+    <option value="suspended">Suspendue</option>
+  </select>
+</div>
+
+<div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Statut publication menu</label>
+  <select
+    id="field-menu-publication-status"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+  >
+    <option value="not_started">Non commencé</option>
+    <option value="encoding">Encodage en cours</option>
+    <option value="ready_for_restaurant_review">Envoyé au restaurateur</option>
+    <option value="validated_by_restaurant">Validé par restaurateur</option>
+    <option value="published">Publié</option>
+    <option value="needs_update">Mise à jour nécessaire</option>
+  </select>
 </div>
 
 <div
