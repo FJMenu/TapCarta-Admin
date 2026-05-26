@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.3.5';
+  const APP_VERSION = 'V2.2.3.6';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -404,8 +404,23 @@
           id="field-logo-file"
           type="file"
           accept="image/png,image/jpeg,image/webp,image/svg+xml"
-          class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+          class="hidden"
         >
+
+        <button
+          id="choose-logo-file-btn"
+          type="button"
+          class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+        >
+          Choisir un logo
+        </button>
+
+        <div
+          id="selected-logo-file-name"
+          class="text-xs text-cream/45"
+        >
+          Aucun fichier sélectionné.
+        </div>
 
         <button
           id="upload-logo-btn"
@@ -3584,6 +3599,7 @@ function applyEditMode() {
     document.getElementById('field-public-page'),
     document.getElementById('field-logo-url'),
     document.getElementById('field-logo-file'),
+    document.getElementById('choose-logo-file-btn'),
     document.getElementById('upload-logo-btn'),
     document.getElementById('field-google-reviews-url'),
     document.getElementById('field-google-maps-url'),
@@ -4587,6 +4603,28 @@ function bindFormEvents() {
 
       currentRestaurantData.publication.menuPublicationStatus = e.target.value;
       markDirty();
+    });
+  }
+
+  const logoFileInput = document.getElementById('field-logo-file');
+  const chooseLogoFileBtn = document.getElementById('choose-logo-file-btn');
+  const selectedLogoFileName = document.getElementById('selected-logo-file-name');
+
+  if (chooseLogoFileBtn && logoFileInput) {
+    chooseLogoFileBtn.addEventListener('click', () => {
+      logoFileInput.click();
+    });
+  }
+
+  if (logoFileInput && selectedLogoFileName) {
+    logoFileInput.addEventListener('change', () => {
+      const file = logoFileInput.files && logoFileInput.files.length
+        ? logoFileInput.files[0]
+        : null;
+
+      selectedLogoFileName.textContent = file
+        ? `Fichier sélectionné : ${file.name}`
+        : 'Aucun fichier sélectionné.';
     });
   }
 
