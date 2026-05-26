@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.3.3';
+  const APP_VERSION = 'V2.2.3.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1517,6 +1517,63 @@ async function loadJoinRequests(options = {}) {
     button.addEventListener('click', async () => {
       pauseTapCartaAutoRefresh(120000);
       await deleteTestJoinRequest(button.dataset.requestId);
+    });
+  });
+}
+function showTapCartaInfoModal({
+  title,
+  message,
+  buttonLabel = 'OK',
+  type = 'info'
+}) {
+  return new Promise((resolve) => {
+    const existingModal = document.getElementById('tapcarta-info-modal');
+    if (existingModal) existingModal.remove();
+
+    const typeClasses = {
+      info: 'border-gold/25 bg-gold/10 text-gold',
+      success: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300',
+      warning: 'border-amber-400/30 bg-amber-500/10 text-amber-300',
+      error: 'border-red-400/35 bg-red-500/10 text-red-300'
+    };
+
+    const badgeClass = typeClasses[type] || typeClasses.info;
+
+    const modal = document.createElement('div');
+    modal.id = 'tapcarta-info-modal';
+    modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4';
+
+    modal.innerHTML = `
+      <div class="w-full max-w-md rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
+        <div class="mb-5">
+          <div class="mb-3 inline-flex rounded-full border ${badgeClass} px-3 py-1 text-xs font-bold uppercase tracking-wide">
+            TapCarta Admin
+          </div>
+
+          <div class="font-display text-2xl text-cream">${title}</div>
+
+          <div class="mt-2 text-sm leading-relaxed text-cream/70">
+            ${message}
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <button
+            type="button"
+            data-modal-action="close"
+            class="rounded-xl border border-gold/30 bg-gold/10 px-5 py-3 text-sm font-semibold text-gold"
+          >
+            ${buttonLabel}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    modal.querySelector('[data-modal-action="close"]').addEventListener('click', () => {
+      modal.remove();
+      resolve(true);
     });
   });
 }
@@ -4008,7 +4065,12 @@ function fillForm(data) {
 }
 async function uploadRestaurantLogo() {
   if (!currentRestaurantId || !currentRestaurantData) {
-    alert('Charge d’abord un établissement.');
+    await showTapCartaInfoModal({
+      title: 'Aucun établissement chargé',
+      message: 'Charge d’abord un établissement avant d’uploader un logo officiel.',
+      buttonLabel: 'Compris',
+      type: 'warning'
+    });
     return;
   }
 
@@ -4016,7 +4078,12 @@ async function uploadRestaurantLogo() {
   const status = document.getElementById('upload-logo-status');
 
   if (!fileInput || !fileInput.files || !fileInput.files.length) {
-    alert('Choisis d’abord un fichier logo.');
+    await showTapCartaInfoModal({
+      title: 'Logo manquant',
+      message: 'Choisis d’abord un fichier logo avant de lancer l’upload.',
+      buttonLabel: 'Choisir un fichier',
+      type: 'warning'
+    });
     return;
   }
 
@@ -4030,14 +4097,24 @@ async function uploadRestaurantLogo() {
   ];
 
   if (!allowedTypes.includes(file.type)) {
-    alert('Format logo non autorisé. Utilise PNG, JPG, WEBP ou SVG.');
+    await showTapCartaInfoModal({
+      title: 'Format non autorisé',
+      message: 'Utilise un logo au format PNG, JPG, WEBP ou SVG.',
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
     return;
   }
 
   const maxSize = 5 * 1024 * 1024;
 
   if (file.size > maxSize) {
-    alert('Logo trop lourd. Maximum 5 MB.');
+    await showTapCartaInfoModal({
+      title: 'Logo trop lourd',
+      message: 'Le fichier dépasse la limite autorisée. Le logo doit faire maximum 5 MB.',
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
     return;
   }
 
@@ -4065,7 +4142,12 @@ async function uploadRestaurantLogo() {
       status.textContent = 'Erreur upload logo.';
     }
 
-    alert('Erreur upload logo : ' + uploadError.message);
+    await showTapCartaInfoModal({
+      title: 'Erreur upload logo',
+      message: `Supabase a refusé l’upload : ${uploadError.message}`,
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
     console.error(uploadError);
     return;
   }
@@ -4081,7 +4163,12 @@ async function uploadRestaurantLogo() {
       status.textContent = 'Logo uploadé, mais URL publique introuvable.';
     }
 
-    alert('Logo uploadé, mais URL publique introuvable.');
+    await showTapCartaInfoModal({
+      title: 'URL logo introuvable',
+      message: 'Le logo semble uploadé, mais l’URL publique n’a pas été récupérée correctement.',
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
     return;
   }
 
