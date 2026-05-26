@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.3.9';
+  const APP_VERSION = 'V2.2.3.10';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -4234,8 +4234,22 @@ async function uploadRestaurantLogo() {
   const plannedCommercialActivationDate =
     currentRestaurantData.billing?.plannedCommercialActivationDate || null;
 
+  const logoUrlField = document.getElementById('field-logo-url');
+  const logoUrlFromField = logoUrlField ? logoUrlField.value.trim() : '';
+
   const logoStoragePath = currentRestaurantData.links?.logoStoragePath || null;
-  const logoUrl = currentRestaurantData.links?.logoUrl || null;
+  const logoUrl =
+    currentRestaurantData.links?.logoUrl ||
+    logoUrlFromField ||
+    null;
+
+  if (!currentRestaurantData.links) {
+    currentRestaurantData.links = {};
+  }
+
+  currentRestaurantData.links.logoUrl = logoUrl || '';
+  currentRestaurantData.links.logoStoragePath = logoStoragePath || '';
+
   const googleReviewsUrl = currentRestaurantData.links?.googleReviewsUrl || null;
   const googleMapsUrl = currentRestaurantData.links?.googleMapsUrl || null;
   const publicPageStatus = currentRestaurantData.publication?.publicPageStatus || 'waiting_page';
