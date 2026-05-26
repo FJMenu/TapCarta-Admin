@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.3.7';
+  const APP_VERSION = 'V2.2.3.8';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -404,16 +404,16 @@
           id="field-logo-file"
           type="file"
           accept="image/png,image/jpeg,image/webp,image/svg+xml"
-          class="hidden"
+          class="sr-only"
         >
 
-        <button
+        <label
           id="choose-logo-file-btn"
-          type="button"
-          class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+          for="field-logo-file"
+          class="cursor-pointer rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-sm font-semibold text-cream/80"
         >
           Choisir un logo
-        </button>
+        </label>
 
         <div
           id="selected-logo-file-name"
@@ -4096,12 +4096,16 @@ async function uploadRestaurantLogo() {
   const status = document.getElementById('upload-logo-status');
 
   if (!fileInput || !fileInput.files || !fileInput.files.length) {
-    await showTapCartaInfoModal({
-      title: 'Logo manquant',
-      message: 'Choisis d’abord un fichier logo avant de lancer l’upload.',
-      buttonLabel: 'Choisir un fichier',
-      type: 'warning'
-    });
+    const status = document.getElementById('upload-logo-status');
+
+    if (status) {
+      status.textContent = 'Choisis d’abord un fichier logo.';
+    }
+
+    if (fileInput) {
+      fileInput.click();
+    }
+
     return;
   }
 
@@ -4607,14 +4611,7 @@ function bindFormEvents() {
   }
 
   const logoFileInput = document.getElementById('field-logo-file');
-  const chooseLogoFileBtn = document.getElementById('choose-logo-file-btn');
   const selectedLogoFileName = document.getElementById('selected-logo-file-name');
-
-  if (chooseLogoFileBtn && logoFileInput) {
-    chooseLogoFileBtn.addEventListener('click', () => {
-      logoFileInput.click();
-    });
-  }
 
   if (logoFileInput && selectedLogoFileName) {
     logoFileInput.addEventListener('change', () => {
