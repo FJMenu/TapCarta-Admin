@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.3.1';
+  const APP_VERSION = 'V2.2.3.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -4005,6 +4005,112 @@ function fillForm(data) {
   renderWorkflowProgress(data);
 
   if (window.lucide) lucide.createIcons();
+}
+async function uploadRestaurantLogo() {
+  if (!currentRestaurantId || !currentRestaurantData) {
+    alert('Charge d’abord un établissement.');
+    return;
+  }
+
+  const fileInput = document.getElementById('field-logo-file');
+  const status = document.getElementById('upload-logo-status');
+
+  if (!fileInput || !fileInput.files || !fileInput.files.length) {
+    alert('Choisis d’abord un fichier logo.');
+    return;
+  }
+
+  const file = fileInput.files[0];
+
+  const allowedTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+    'image/svg+xml'
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    alert('Format logo non autorisé. Utilise PNG, JPG, WEBP ou SVG.');
+    return;
+  }
+
+  const maxSize = 5 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    alert('Logo trop lourd. Maximum 5 MB.');
+    return;
+  }
+
+  const extensionFromName = file.name.includes('.')
+    ? file.name.split('.').pop().toLowerCase()
+    : 'png';
+
+  const safeExtension = extensionFromName === 'jpg' ? 'jpeg' : extensionFromName;
+
+  const storagePath = `restaurants/${currentRestaurantId}/logo/logo-${Date.now()}.${safeExtension}`;
+
+  if (status) {
+    status.textContent = 'Upload du logo en cours...';
+  }
+
+  const { error: uploadError } = await tapCartaSupabase.storage
+    .from('restaurant-assets')
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+
+  if (uploadError) {
+    if (status) {
+      status.textContent = 'Erreur upload logo.';
+    }
+
+    alert('Erreur upload logo : ' + uploadError.message);
+    console.error(uploadError);
+    return;
+  }
+
+  const { data: publicUrlData } = tapCartaSupabase.storage
+    .from('restaurant-assets')
+    .getPublicUrl(storagePath);
+
+  const publicUrl = publicUrlData?.publicUrl || '';
+
+  if (!publicUrl) {
+    if (status) {
+      status.textContent = 'Logo uploadé, mais URL publique introuvable.';
+    }
+
+    alert('Logo uploadé, mais URL publique introuvable.');
+    return;
+  }
+
+  if (!currentRestaurantData.links) {
+    currentRestaurantData.links = {};
+  }
+
+  currentRestaurantData.links.logoStoragePath = storagePath;
+  currentRestaurantData.links.logoUrl = publicUrl;
+
+  const logoUrlField = document.getElementById('field-logo-url');
+  if (logoUrlField) {
+    logoUrlField.value = publicUrl;
+  }
+
+  const logoPreview = document.getElementById('field-logo-preview');
+  const logoEmpty = document.getElementById('field-logo-empty');
+
+  if (logoPreview && logoEmpty) {
+    logoPreview.src = publicUrl;
+    logoPreview.classList.remove('hidden');
+    logoEmpty.classList.add('hidden');
+  }
+
+  if (status) {
+    status.textContent = 'Logo uploadé. Clique sur Enregistrer pour sauvegarder le restaurant.';
+  }
+
+  markDirty();
 }
     async function saveCurrentRestaurantToSupabase() {
   if (!currentRestaurantData || !currentRestaurantId) {
