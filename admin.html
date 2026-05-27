@@ -4088,6 +4088,32 @@ function fillForm(data) {
     }
   }
 
+  const qrFramedUrlField = document.getElementById('field-qr-framed-url');
+  if (qrFramedUrlField) {
+    qrFramedUrlField.value = data.links?.qrFramedUrl || '';
+  }
+
+  const qrFramedPreview = document.getElementById('field-qr-framed-preview');
+  const qrFramedEmpty = document.getElementById('field-qr-framed-empty');
+
+  if (qrFramedPreview && qrFramedEmpty) {
+    if (data.links?.qrFramedUrl && !String(data.links.qrFramedUrl).toLowerCase().endsWith('.pdf')) {
+      qrFramedPreview.src = data.links.qrFramedUrl;
+      qrFramedPreview.classList.remove('hidden');
+      qrFramedEmpty.classList.add('hidden');
+    } else if (data.links?.qrFramedUrl) {
+      qrFramedPreview.src = '';
+      qrFramedPreview.classList.add('hidden');
+      qrFramedEmpty.textContent = 'PDF disponible';
+      qrFramedEmpty.classList.remove('hidden');
+    } else {
+      qrFramedPreview.src = '';
+      qrFramedPreview.classList.add('hidden');
+      qrFramedEmpty.textContent = 'Aucun QR';
+      qrFramedEmpty.classList.remove('hidden');
+    }
+  }
+
   const googleReviewsField = document.getElementById('field-google-reviews-url');
   if (googleReviewsField) {
     googleReviewsField.value = data.links?.googleReviewsUrl || '';
@@ -4458,12 +4484,28 @@ async function saveCurrentRestaurantToSupabase() {
     logoUrlFromField ||
     null;
 
+  const qrFramedUrlField = document.getElementById('field-qr-framed-url');
+  const qrFramedUrlFromField = qrFramedUrlField ? qrFramedUrlField.value.trim() : '';
+
+  const qrFramedStoragePath = currentRestaurantData.links?.qrFramedStoragePath || null;
+  const qrFramedUrl =
+    currentRestaurantData.links?.qrFramedUrl ||
+    qrFramedUrlFromField ||
+    null;
+
+  const qrPublicStoragePath = currentRestaurantData.links?.qrPublicStoragePath || null;
+  const qrPublicUrl = currentRestaurantData.links?.qrPublicUrl || null;
+
   if (!currentRestaurantData.links) {
     currentRestaurantData.links = {};
   }
 
   currentRestaurantData.links.logoUrl = logoUrl || '';
   currentRestaurantData.links.logoStoragePath = logoStoragePath || '';
+  currentRestaurantData.links.qrFramedStoragePath = qrFramedStoragePath || '';
+  currentRestaurantData.links.qrFramedUrl = qrFramedUrl || '';
+  currentRestaurantData.links.qrPublicStoragePath = qrPublicStoragePath || '';
+  currentRestaurantData.links.qrPublicUrl = qrPublicUrl || '';
 
   const googleReviewsUrl = currentRestaurantData.links?.googleReviewsUrl || null;
   const googleMapsUrl = currentRestaurantData.links?.googleMapsUrl || null;
@@ -4485,6 +4527,10 @@ async function saveCurrentRestaurantToSupabase() {
       public_url: publicUrl,
       logo_storage_path: logoStoragePath,
       logo_url: logoUrl,
+      qr_framed_storage_path: qrFramedStoragePath,
+      qr_framed_url: qrFramedUrl,
+      qr_public_storage_path: qrPublicStoragePath,
+      qr_public_url: qrPublicUrl,
       google_reviews_url: googleReviewsUrl,
       google_maps_url: googleMapsUrl,
       public_page_status: publicPageStatus,
@@ -5145,6 +5191,10 @@ async function loadRestaurantData(id) {
       resto_url,
       logo_storage_path,
       logo_url,
+      qr_framed_storage_path,
+      qr_framed_url,
+      qr_public_storage_path,
+      qr_public_url,
       google_reviews_url,
       google_maps_url,
       public_page_status,
@@ -5329,6 +5379,10 @@ async function loadRestaurantData(id) {
       restoUrl: restaurant.resto_url || '',
       logoStoragePath: restaurant.logo_storage_path || '',
       logoUrl: restaurant.logo_url || '',
+      qrFramedStoragePath: restaurant.qr_framed_storage_path || '',
+      qrFramedUrl: restaurant.qr_framed_url || '',
+      qrPublicStoragePath: restaurant.qr_public_storage_path || '',
+      qrPublicUrl: restaurant.qr_public_url || '',
       googleReviewsUrl: restaurant.google_reviews_url || '',
       googleMapsUrl: restaurant.google_maps_url || ''
     },
