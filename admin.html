@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.3.14';
+  const APP_VERSION = 'V2.2.4.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -543,8 +543,8 @@
     id="field-public-page-status"
     class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
   >
-    <option value="waiting_page">Page d’attente</option>
-    <option value="ready_for_review">Prête à vérifier</option>
+    <option value="construction">Page en construction</option>
+    <option value="review">En attente de publication</option>
     <option value="live">Menu live</option>
     <option value="suspended">Suspendue</option>
   </select>
@@ -4509,7 +4509,7 @@ async function saveCurrentRestaurantToSupabase() {
 
   const googleReviewsUrl = currentRestaurantData.links?.googleReviewsUrl || null;
   const googleMapsUrl = currentRestaurantData.links?.googleMapsUrl || null;
-  const publicPageStatus = currentRestaurantData.publication?.publicPageStatus || 'waiting_page';
+  const publicPageStatus = currentRestaurantData.publication?.publicPageStatus || 'construction';
   const menuPublicationStatus = currentRestaurantData.publication?.menuPublicationStatus || 'not_started';
 
   const activeLanguages = Array.isArray(currentRestaurantData.languages?.active)
@@ -5387,7 +5387,7 @@ async function loadRestaurantData(id) {
       googleMapsUrl: restaurant.google_maps_url || ''
     },
     publication: {
-      publicPageStatus: restaurant.public_page_status || 'waiting_page',
+      publicPageStatus: restaurant.public_page_status || 'construction',
       menuPublicationStatus: restaurant.menu_publication_status || 'not_started',
       menuValidatedAt: restaurant.menu_validated_at || '',
       menuPublishedAt: restaurant.menu_published_at || ''
