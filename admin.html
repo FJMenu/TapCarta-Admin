@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.4.1';
+  const APP_VERSION = 'V2.2.4.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -4298,6 +4298,35 @@ async function uploadRestaurantLogo() {
 
   currentRestaurantData.links.logoStoragePath = storagePath;
   currentRestaurantData.links.logoUrl = publicUrl;
+
+  const { error: restaurantLogoUpdateError } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      logo_storage_path: storagePath,
+      logo_url: publicUrl,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', currentRestaurantId);
+
+  if (restaurantLogoUpdateError) {
+    if (status) {
+      status.textContent = 'Logo uploadé, mais non enregistré dans restaurants.';
+    }
+
+    await showTapCartaInfoModal({
+      title: 'Logo uploadé, mais non enregistré',
+      message: `Le fichier est bien uploadé, mais Supabase a refusé la mise à jour du restaurant : ${restaurantLogoUpdateError.message}`,
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
+
+    console.error(restaurantLogoUpdateError);
+    return;
+  }
+
+  if (status) {
+    status.textContent = 'Logo uploadé et enregistré pour l’icône du menu.';
+  }
 
   const logoUrlField = document.getElementById('field-logo-url');
   if (logoUrlField) {
