@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.4.2';
+  const APP_VERSION = 'V2.2.4.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -440,76 +440,6 @@
 
       <p class="mt-2 text-xs text-cream/45">
         Le logo officiel est uploadé par Admin dans Supabase Storage. Resto ne pourra pas le modifier.
-      </p>
-    </div>
-  </div>
-</div>
-
-<div class="rounded-2xl border border-gold/18 bg-black/15 px-4 py-4">
-  <div class="text-xs uppercase tracking-wide text-gold/80 font-bold">
-    Icône application / installation
-  </div>
-
-  <div class="mt-3 flex items-center gap-4">
-    <div class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black/25">
-      <img
-        id="field-app-icon-preview"
-        src=""
-        alt="Icône application restaurant"
-        class="hidden h-full w-full object-contain"
-      >
-      <span id="field-app-icon-empty" class="text-xs text-cream/40">Aucune</span>
-    </div>
-
-    <div class="min-w-0 flex-1">
-      <input
-        id="field-app-icon-url"
-        type="text"
-        class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
-        placeholder="URL de l’icône carrée utilisée pour l’app installée"
-      >
-
-      <div class="mt-3 flex flex-col gap-2">
-        <input
-          id="field-app-icon-file"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          class="sr-only"
-        >
-
-        <label
-          id="choose-app-icon-file-btn"
-          for="field-app-icon-file"
-          class="cursor-pointer rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-center text-sm font-semibold text-cream/80"
-        >
-          Choisir une icône carrée
-        </label>
-
-        <div
-          id="selected-app-icon-file-name"
-          class="text-xs text-cream/45"
-        >
-          Aucun fichier sélectionné.
-        </div>
-
-        <button
-          id="upload-app-icon-btn"
-          type="button"
-          class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
-        >
-          Uploader / remplacer l’icône app
-        </button>
-
-        <div
-          id="upload-app-icon-status"
-          class="text-xs text-cream/45"
-        >
-          Aucun upload en cours.
-        </div>
-      </div>
-
-      <p class="mt-2 text-xs text-cream/45">
-        Icône carrée utilisée uniquement pour l’app installée sur téléphone. Recommandé : PNG 512x512 avec fond plein.
       </p>
     </div>
   </div>
@@ -4228,6 +4158,26 @@ function fillForm(data) {
     }
   }
 
+  const appIconUrlField = document.getElementById('field-app-icon-url');
+  const appIconPreview = document.getElementById('field-app-icon-preview');
+  const appIconEmpty = document.getElementById('field-app-icon-empty');
+
+  if (appIconUrlField) {
+    appIconUrlField.value = data.links?.appIconUrl || '';
+  }
+
+  if (appIconPreview && appIconEmpty) {
+    if (data.links?.appIconUrl) {
+      appIconPreview.src = data.links.appIconUrl;
+      appIconPreview.classList.remove('hidden');
+      appIconEmpty.classList.add('hidden');
+    } else {
+      appIconPreview.src = '';
+      appIconPreview.classList.add('hidden');
+      appIconEmpty.classList.remove('hidden');
+    }
+  }
+
   const qrFramedUrlField = document.getElementById('field-qr-framed-url');
   if (qrFramedUrlField) {
     qrFramedUrlField.value = data.links?.qrFramedUrl || '';
@@ -4485,6 +4435,163 @@ async function uploadRestaurantLogo() {
   markDirty();
 }
 
+async function uploadRestaurantAppIcon() {
+  if (!currentRestaurantId || !currentRestaurantData) {
+    await showTapCartaInfoModal({
+      title: 'Aucun établissement chargé',
+      message: 'Charge d’abord un établissement avant d’uploader une icône application.',
+      buttonLabel: 'Compris',
+      type: 'warning'
+    });
+    return;
+  }
+
+  const fileInput = document.getElementById('field-app-icon-file');
+  const status = document.getElementById('upload-app-icon-status');
+
+  if (!fileInput || !fileInput.files || !fileInput.files.length) {
+    if (status) {
+      status.textContent = 'Choisis d’abord un fichier icône.';
+    }
+
+    if (fileInput) {
+      fileInput.click();
+    }
+
+    return;
+  }
+
+  const file = fileInput.files[0];
+
+  const allowedTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/webp'
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    await showTapCartaInfoModal({
+      title: 'Format non autorisé',
+      message: 'Utilise une icône au format PNG, JPG ou WEBP.',
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
+    return;
+  }
+
+  const maxSize = 5 * 1024 * 1024;
+
+  if (file.size > maxSize) {
+    await showTapCartaInfoModal({
+      title: 'Icône trop lourde',
+      message: 'Le fichier dépasse la limite autorisée. L’icône doit faire maximum 5 MB.',
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
+    return;
+  }
+
+  const extensionFromName = file.name.includes('.')
+    ? file.name.split('.').pop().toLowerCase()
+    : 'png';
+
+  const safeExtension = extensionFromName === 'jpg' ? 'jpeg' : extensionFromName;
+  const storagePath = `restaurants/${currentRestaurantId}/app-icon/app-icon-${Date.now()}.${safeExtension}`;
+
+  if (status) {
+    status.textContent = 'Upload de l’icône app en cours...';
+  }
+
+  const { error: uploadError } = await tapCartaSupabase.storage
+    .from('restaurant-assets')
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      upsert: true
+    });
+
+  if (uploadError) {
+    if (status) {
+      status.textContent = 'Erreur upload icône app.';
+    }
+
+    await showTapCartaInfoModal({
+      title: 'Erreur upload icône app',
+      message: `Supabase a refusé l’upload : ${uploadError.message}`,
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
+
+    console.error(uploadError);
+    return;
+  }
+
+  const { data: publicUrlData } = tapCartaSupabase.storage
+    .from('restaurant-assets')
+    .getPublicUrl(storagePath);
+
+  const publicUrl = publicUrlData?.publicUrl || '';
+
+  if (!publicUrl) {
+    if (status) {
+      status.textContent = 'Icône uploadée, mais URL publique introuvable.';
+    }
+
+    return;
+  }
+
+  if (!currentRestaurantData.links) {
+    currentRestaurantData.links = {};
+  }
+
+  currentRestaurantData.links.appIconStoragePath = storagePath;
+  currentRestaurantData.links.appIconUrl = publicUrl;
+
+  const { error: restaurantIconUpdateError } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      app_icon_storage_path: storagePath,
+      app_icon_url: publicUrl,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', currentRestaurantId);
+
+  if (restaurantIconUpdateError) {
+    if (status) {
+      status.textContent = 'Icône uploadée, mais non enregistrée dans restaurants.';
+    }
+
+    await showTapCartaInfoModal({
+      title: 'Icône uploadée, mais non enregistrée',
+      message: `Le fichier est bien uploadé, mais Supabase a refusé la mise à jour du restaurant : ${restaurantIconUpdateError.message}`,
+      buttonLabel: 'Compris',
+      type: 'error'
+    });
+
+    console.error(restaurantIconUpdateError);
+    return;
+  }
+
+  const appIconUrlField = document.getElementById('field-app-icon-url');
+  const appIconPreview = document.getElementById('field-app-icon-preview');
+  const appIconEmpty = document.getElementById('field-app-icon-empty');
+
+  if (appIconUrlField) {
+    appIconUrlField.value = publicUrl;
+  }
+
+  if (appIconPreview && appIconEmpty) {
+    appIconPreview.src = publicUrl;
+    appIconPreview.classList.remove('hidden');
+    appIconEmpty.classList.add('hidden');
+  }
+
+  if (status) {
+    status.textContent = 'Icône app uploadée et enregistrée.';
+  }
+
+  markDirty();
+}
+
 async function uploadRestaurantQrFramed() {
   if (!currentRestaurantId || !currentRestaurantData) {
     await showTapCartaInfoModal({
@@ -4653,6 +4760,15 @@ async function saveCurrentRestaurantToSupabase() {
     logoUrlFromField ||
     null;
 
+  const appIconUrlField = document.getElementById('field-app-icon-url');
+  const appIconUrlFromField = appIconUrlField ? appIconUrlField.value.trim() : '';
+
+  const appIconStoragePath = currentRestaurantData.links?.appIconStoragePath || null;
+  const appIconUrl =
+    currentRestaurantData.links?.appIconUrl ||
+    appIconUrlFromField ||
+    null;
+
   const qrFramedUrlField = document.getElementById('field-qr-framed-url');
   const qrFramedUrlFromField = qrFramedUrlField ? qrFramedUrlField.value.trim() : '';
 
@@ -4671,6 +4787,8 @@ async function saveCurrentRestaurantToSupabase() {
 
   currentRestaurantData.links.logoUrl = logoUrl || '';
   currentRestaurantData.links.logoStoragePath = logoStoragePath || '';
+  currentRestaurantData.links.appIconUrl = appIconUrl || '';
+  currentRestaurantData.links.appIconStoragePath = appIconStoragePath || '';
   currentRestaurantData.links.qrFramedStoragePath = qrFramedStoragePath || '';
   currentRestaurantData.links.qrFramedUrl = qrFramedUrl || '';
   currentRestaurantData.links.qrPublicStoragePath = qrPublicStoragePath || '';
@@ -4696,6 +4814,8 @@ async function saveCurrentRestaurantToSupabase() {
       public_url: publicUrl,
       logo_storage_path: logoStoragePath,
       logo_url: logoUrl,
+      app_icon_storage_path: appIconStoragePath,
+      app_icon_url: appIconUrl,
       qr_framed_storage_path: qrFramedStoragePath,
       qr_framed_url: qrFramedUrl,
       qr_public_storage_path: qrPublicStoragePath,
@@ -4998,6 +5118,56 @@ function bindFormEvents() {
 
       markDirty();
     });
+  }
+
+  const appIconUrlField = document.getElementById('field-app-icon-url');
+  if (appIconUrlField) {
+    appIconUrlField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links) {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.appIconUrl = e.target.value.trim();
+
+      const appIconPreview = document.getElementById('field-app-icon-preview');
+      const appIconEmpty = document.getElementById('field-app-icon-empty');
+
+      if (appIconPreview && appIconEmpty) {
+        if (currentRestaurantData.links.appIconUrl) {
+          appIconPreview.src = currentRestaurantData.links.appIconUrl;
+          appIconPreview.classList.remove('hidden');
+          appIconEmpty.classList.add('hidden');
+        } else {
+          appIconPreview.src = '';
+          appIconPreview.classList.add('hidden');
+          appIconEmpty.classList.remove('hidden');
+        }
+      }
+
+      markDirty();
+    });
+  }
+
+  const appIconFileInput = document.getElementById('field-app-icon-file');
+  const selectedAppIconFileName = document.getElementById('selected-app-icon-file-name');
+
+  if (appIconFileInput && selectedAppIconFileName) {
+    appIconFileInput.addEventListener('change', () => {
+      const file = appIconFileInput.files && appIconFileInput.files.length
+        ? appIconFileInput.files[0]
+        : null;
+
+      selectedAppIconFileName.textContent = file
+        ? `Fichier sélectionné : ${file.name}`
+        : 'Aucun fichier sélectionné.';
+    });
+  }
+
+  const uploadAppIconBtn = document.getElementById('upload-app-icon-btn');
+  if (uploadAppIconBtn) {
+    uploadAppIconBtn.addEventListener('click', uploadRestaurantAppIcon);
   }
 
   const googleReviewsField = document.getElementById('field-google-reviews-url');
