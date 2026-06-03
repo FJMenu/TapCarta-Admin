@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.1.1';
+  const APP_VERSION = 'V2.3.2.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -604,6 +604,16 @@
     type="url"
     class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
     placeholder="https://maps.google.com/..."
+  >
+</div>
+
+<div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Lien lecture avis Google</label>
+  <input
+    id="field-google-reviews-read-url"
+    type="url"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+    placeholder="https://www.google.com/search?...Avis..."
   >
 </div>
 
@@ -4228,6 +4238,11 @@ function fillForm(data) {
     googleMapsField.value = data.links?.googleMapsUrl || '';
   }
 
+  const googleReviewsReadField = document.getElementById('field-google-reviews-read-url');
+  if (googleReviewsReadField) {
+    googleReviewsReadField.value = data.links?.googleReviewsReadUrl || '';
+  }
+
   const googlePlaceIdField = document.getElementById('field-google-place-id');
   if (googlePlaceIdField) {
     googlePlaceIdField.value = data.links?.googlePlaceId || '';
@@ -4815,6 +4830,7 @@ async function saveCurrentRestaurantToSupabase() {
 
   const googleReviewsUrl = currentRestaurantData.links?.googleReviewsUrl || null;
   const googleMapsUrl = currentRestaurantData.links?.googleMapsUrl || null;
+  const googleReviewsReadUrl = currentRestaurantData.links?.googleReviewsReadUrl || null;
   const publicPageStatus = currentRestaurantData.publication?.publicPageStatus || 'construction';
   const menuPublicationStatus = currentRestaurantData.publication?.menuPublicationStatus || 'not_started';
 
@@ -4841,6 +4857,7 @@ async function saveCurrentRestaurantToSupabase() {
       qr_public_url: qrPublicUrl,
       google_reviews_url: googleReviewsUrl,
       google_maps_url: googleMapsUrl,
+      google_reviews_read_url: googleReviewsReadUrl,
       google_place_id: currentRestaurantData.links?.googlePlaceId || null,
       public_page_status: publicPageStatus,
       menu_publication_status: menuPublicationStatus,
@@ -5316,6 +5333,20 @@ function bindFormEvents() {
     uploadQrFramedBtn.addEventListener('click', uploadRestaurantQrFramed);
   }
 
+  const googleReviewsReadInput = document.getElementById('field-google-reviews-read-url');
+  if (googleReviewsReadInput) {
+    googleReviewsReadInput.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links || typeof currentRestaurantData.links !== 'object') {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.googleReviewsReadUrl = e.target.value.trim();
+      markDirty();
+    });
+  }
+
   const googlePlaceIdField = document.getElementById('field-google-place-id');
   if (googlePlaceIdField) {
     googlePlaceIdField.addEventListener('input', (e) => {
@@ -5763,6 +5794,7 @@ async function loadRestaurantData(id) {
       qrPublicUrl: restaurant.qr_public_url || '',
       googleReviewsUrl: restaurant.google_reviews_url || '',
       googleMapsUrl: restaurant.google_maps_url || '',
+      googleReviewsReadUrl: restaurant.google_reviews_read_url || '',
       googlePlaceId: restaurant.google_place_id || ''
     },
     publication: {
