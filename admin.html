@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.2.4.4';
+  const APP_VERSION = 'V2.3.1.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -605,6 +605,19 @@
     class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
     placeholder="https://maps.google.com/..."
   >
+</div>
+
+<div>
+  <label class="block text-xs uppercase tracking-wide text-cream/45 mb-2">Google Place ID</label>
+  <input
+    id="field-google-place-id"
+    type="text"
+    class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
+    placeholder="Exemple : ChIJ..."
+  >
+  <p class="mt-2 text-xs text-cream/45">
+    Utilisé par TapCarta pour synchroniser automatiquement la vraie note Google du restaurant.
+  </p>
 </div>
 
 <div>
@@ -3745,6 +3758,7 @@ function applyEditMode() {
     document.getElementById('upload-logo-btn'),
     document.getElementById('field-google-reviews-url'),
     document.getElementById('field-google-maps-url'),
+    document.getElementById('field-google-place-id'),
     document.getElementById('field-public-page-status'),
     document.getElementById('field-menu-publication-status'),
     document.getElementById('planned-commercial-activation-date'),
@@ -4212,6 +4226,11 @@ function fillForm(data) {
   const googleMapsField = document.getElementById('field-google-maps-url');
   if (googleMapsField) {
     googleMapsField.value = data.links?.googleMapsUrl || '';
+  }
+
+  const googlePlaceIdField = document.getElementById('field-google-place-id');
+  if (googlePlaceIdField) {
+    googlePlaceIdField.value = data.links?.googlePlaceId || '';
   }
 
   const publicPageStatusField = document.getElementById('field-public-page-status');
@@ -4822,6 +4841,7 @@ async function saveCurrentRestaurantToSupabase() {
       qr_public_url: qrPublicUrl,
       google_reviews_url: googleReviewsUrl,
       google_maps_url: googleMapsUrl,
+      google_place_id: currentRestaurantData.links?.googlePlaceId || null,
       public_page_status: publicPageStatus,
       menu_publication_status: menuPublicationStatus,
       planned_commercial_activation_date: plannedCommercialActivationDate,
@@ -5296,6 +5316,20 @@ function bindFormEvents() {
     uploadQrFramedBtn.addEventListener('click', uploadRestaurantQrFramed);
   }
 
+  const googlePlaceIdField = document.getElementById('field-google-place-id');
+  if (googlePlaceIdField) {
+    googlePlaceIdField.addEventListener('input', (e) => {
+      if (!currentRestaurantData) return;
+
+      if (!currentRestaurantData.links || typeof currentRestaurantData.links !== 'object') {
+        currentRestaurantData.links = {};
+      }
+
+      currentRestaurantData.links.googlePlaceId = e.target.value.trim();
+      markDirty();
+    });
+  }
+
   const plannedCommercialActivationDateField = document.getElementById('planned-commercial-activation-date');
   if (plannedCommercialActivationDateField) {
     plannedCommercialActivationDateField.addEventListener('change', (e) => {
@@ -5538,6 +5572,7 @@ async function loadRestaurantData(id) {
       qr_public_url,
       google_reviews_url,
       google_maps_url,
+      google_place_id,
       public_page_status,
       menu_publication_status,
       menu_validated_at,
@@ -5727,7 +5762,8 @@ async function loadRestaurantData(id) {
       qrPublicStoragePath: restaurant.qr_public_storage_path || '',
       qrPublicUrl: restaurant.qr_public_url || '',
       googleReviewsUrl: restaurant.google_reviews_url || '',
-      googleMapsUrl: restaurant.google_maps_url || ''
+      googleMapsUrl: restaurant.google_maps_url || '',
+      googlePlaceId: restaurant.google_place_id || ''
     },
     publication: {
       publicPageStatus: restaurant.public_page_status || 'construction',
