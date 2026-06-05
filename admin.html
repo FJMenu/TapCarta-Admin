@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.4.5';
+  const APP_VERSION = 'V2.3.4.6';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1869,7 +1869,7 @@ async function createManualRestaurantFromAdmin(form, modal) {
   const restaurantName = String(formData.get('restaurantName') || '').trim();
   const restaurantSlug = normalizeTapCartaManualSlug(formData.get('restaurantSlug') || '');
   const restaurantPack = String(formData.get('restaurantPack') || 'light').trim() || 'light';
-  const restaurantStatus = String(formData.get('restaurantStatus') || 'lead').trim() || 'lead';
+  const restaurantStatus = String(formData.get('restaurantStatus') || 'setup_in_progress').trim() || 'setup_in_progress';
   const internalType = String(formData.get('internalType') || 'manual').trim() || 'manual';
   const internalNote = String(formData.get('internalNote') || '').trim();
 
