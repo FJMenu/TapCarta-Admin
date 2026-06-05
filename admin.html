@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.4.4';
+  const APP_VERSION = 'V2.3.4.5';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1907,6 +1907,9 @@ async function createManualRestaurantFromAdmin(form, modal) {
     const nowIso = new Date().toISOString();
     const publicUrl = buildTapCartaPublicUrlFromSlug(restaurantSlug);
     const packLabel = getManualRestaurantSelectedPackLabel(restaurantPack);
+    const normalizedPack = ['light', 'standard', 'plus'].includes(restaurantPack)
+      ? restaurantPack
+      : 'light';
 
     const { data: existingRestaurant, error: existingError } = await tapCartaSupabase
       .from('restaurants')
@@ -1926,7 +1929,7 @@ async function createManualRestaurantFromAdmin(form, modal) {
       name: restaurantName,
       slug: restaurantSlug,
       status: restaurantStatus,
-      pack_code: restaurantPack,
+      pack_code: normalizedPack,
       public_url: publicUrl,
       public_page_status: 'construction',
       menu_publication_status: 'not_started',
@@ -1951,11 +1954,23 @@ async function createManualRestaurantFromAdmin(form, modal) {
 
     const restaurantId = insertedRestaurant.id;
 
+    const defaultModuleStatuses = {
+      web: normalizedPack !== 'light' ? 'active' : 'hidden',
+      ordering: normalizedPack === 'plus' ? 'active' : 'hidden',
+      booking: normalizedPack === 'plus' ? 'active' : 'hidden',
+      preorderIndicative: normalizedPack === 'plus' ? 'active' : 'hidden',
+      googleReviews: normalizedPack !== 'light' ? 'active' : 'hidden',
+      whatsapp: 'active',
+      phone: 'active',
+      directions: 'active'
+    };
+
     const defaultModules = {
-      ordering: restaurantPack === 'plus',
-      booking: restaurantPack === 'plus',
-      preorderIndicative: restaurantPack === 'plus',
-      googleReviews: restaurantPack !== 'light',
+      web: defaultModuleStatuses.web === 'active',
+      ordering: defaultModuleStatuses.ordering === 'active',
+      booking: defaultModuleStatuses.booking === 'active',
+      preorderIndicative: defaultModuleStatuses.preorderIndicative === 'active',
+      googleReviews: defaultModuleStatuses.googleReviews === 'active',
       whatsapp: true,
       phone: true,
       directions: true
@@ -1967,16 +1982,17 @@ async function createManualRestaurantFromAdmin(form, modal) {
         restaurant_id: restaurantId,
         active_languages: ['fr', 'es', 'en', 'nl'],
         modules: defaultModules,
-        modules_json: {
-          ordering: defaultModules.ordering ? 'active' : 'hidden',
-          booking: defaultModules.booking ? 'active' : 'hidden',
-          whatsapp: 'active',
-          phone: 'active',
-          directions: 'active',
-          googleReviews: defaultModules.googleReviews ? 'active' : 'hidden'
+        modules_json: defaultModuleStatuses,
+        contact_json: {
+          phone: '',
+          whatsapp: '',
+          externalLinks: []
         },
-        contact_json: {},
-        customer_messages_json: [],
+        customer_messages_json: [
+          { active: false, text: '' },
+          { active: false, text: '' },
+          { active: false, text: '' }
+        ],
         updated_at: nowIso
       });
 
