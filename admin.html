@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.4.2';
+  const APP_VERSION = 'V2.3.4.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -249,11 +249,19 @@
         <option value="setup">En création</option>
         <option value="special">Vitrines / pilotes / partenaires</option>
         <option value="suspended">Suspendus / rejetés</option>
-        <option value="trash">Corbeille</option>
+        <option value="trash">Corbeille établissements</option>
         <option value="light">Pack Light</option>
         <option value="standard">Pack Standard</option>
         <option value="plus">Pack Plus</option>
       </select>
+
+      <button
+        id="show-establishments-trash-btn"
+        type="button"
+        class="rounded-xl border border-red-400/35 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200"
+      >
+        Voir corbeille établissements
+      </button>
 
       <button
         id="reload-establishments-btn"
@@ -1627,7 +1635,7 @@ async function loadJoinRequests(options = {}) {
 
     <details class="mt-5 rounded-2xl border border-red-400/20 bg-red-500/5 p-4">
       <summary class="cursor-pointer text-xs uppercase tracking-wide text-red-300/80 font-semibold">
-        Archives / Corbeille (${archivedTestRequests.length})
+        Archives des demandes (${archivedTestRequests.length})
       </summary>
 
       <div class="mt-4 space-y-3">
@@ -6701,6 +6709,24 @@ async function loadRestaurantsIndex() {
     });
 
     reloadBtn.dataset.boundReloadEstablishments = 'true';
+  }
+
+  const trashBtn = document.getElementById('show-establishments-trash-btn');
+  if (trashBtn && !trashBtn.dataset.boundShowTrash) {
+    trashBtn.addEventListener('click', () => {
+      const establishmentsFilter = document.getElementById('establishments-filter');
+      if (establishmentsFilter) {
+        establishmentsFilter.value = 'trash';
+      }
+
+      renderEstablishmentsList();
+      document.getElementById('establishments-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
+
+    trashBtn.dataset.boundShowTrash = 'true';
   }
 
   renderEstablishmentsList();
