@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.4.1';
+  const APP_VERSION = 'V2.3.4.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -7193,6 +7193,18 @@ function renderEstablishmentsList() {
       }
 
       await loadRestaurantsIndex();
+    });
+  });
+
+  list.querySelectorAll('[data-action="archive-establishment"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await archiveEstablishmentFromAdmin(button.dataset.restaurantId);
+    });
+  });
+
+  list.querySelectorAll('[data-action="restore-establishment"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      await restoreEstablishmentFromAdmin(button.dataset.restaurantId);
     });
   });
 
