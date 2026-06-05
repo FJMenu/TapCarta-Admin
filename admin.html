@@ -1123,6 +1123,11 @@ async function initializeSaasAdmin() {
     notificationBtn.addEventListener('click', requestTapCartaNotifications);
   }
 
+  const manualRestaurantBtn = document.getElementById('open-manual-restaurant-modal-btn');
+  if (manualRestaurantBtn) {
+    manualRestaurantBtn.addEventListener('click', showTapCartaManualRestaurantModal);
+  }
+
   updateNotificationButtonVisibility();
 
   const { data } = await tapCartaSupabase.auth.getSession();
@@ -1819,6 +1824,207 @@ function showTapCartaConfirmModal({
       resolve(true);
     });
   });
+}
+
+function normalizeTapCartaManualSlug(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/&/g, ' et ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function showTapCartaManualRestaurantModal() {
+  const existingModal = document.getElementById('tapcarta-manual-restaurant-modal');
+  if (existingModal) existingModal.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'tapcarta-manual-restaurant-modal';
+  modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4';
+
+  modal.innerHTML = `
+    <div class="w-full max-w-2xl rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
+      <div class="mb-5">
+        <div class="font-display text-2xl text-cream">Créer un établissement manuel</div>
+        <div class="mt-2 text-sm leading-relaxed text-cream/70">
+          Création super-admin sans demande publique. Les données manquantes seront signalées plus tard,
+          mais elles ne bloquent pas la création.
+        </div>
+      </div>
+
+      <form id="tapcarta-manual-restaurant-form" class="space-y-4">
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+            Nom du restaurant *
+          </label>
+          <input
+            id="manual-restaurant-name"
+            name="restaurantName"
+            type="text"
+            autocomplete="off"
+            class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
+            placeholder="Ex. La Sarten Manilva"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+            Slug public *
+          </label>
+          <input
+            id="manual-restaurant-slug"
+            name="restaurantSlug"
+            type="text"
+            autocomplete="off"
+            class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
+            placeholder="la-sarten-manilva"
+          >
+          <p class="mt-2 text-xs text-cream/45">
+            Utilisé pour l’URL publique propre. Exemple : tapcarta.com/la-sarten-manilva/
+          </p>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2">
+          <div>
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+              Pack initial
+            </label>
+            <select
+              id="manual-restaurant-pack"
+              name="restaurantPack"
+              class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
+            >
+              <option value="light">Light</option>
+              <option value="standard">Standard</option>
+              <option value="plus">Plus</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+              Statut initial
+            </label>
+            <select
+              id="manual-restaurant-status"
+              name="restaurantStatus"
+              class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
+            >
+              <option value="lead">En préparation</option>
+              <option value="active">Actif</option>
+              <option value="inactive">Inactif</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+            Type d’activation interne
+          </label>
+          <select
+            id="manual-restaurant-internal-type"
+            name="internalType"
+            class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
+          >
+            <option value="manual">Création manuelle</option>
+            <option value="free_test">Restaurant test</option>
+            <option value="showcase">Restaurant vitrine</option>
+            <option value="partner">Partenaire</option>
+            <option value="promo">Promo / gratuité temporaire</option>
+          </select>
+          <p class="mt-2 text-xs text-cream/45">
+            Cette information servira au suivi Admin. Elle ne remplace pas le statut public de la page.
+          </p>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+            Note interne facultative
+          </label>
+          <textarea
+            id="manual-restaurant-note"
+            name="internalNote"
+            rows="3"
+            class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
+            placeholder="Ex. restaurant créé manuellement pour test, vitrine ou promo temporaire..."
+          ></textarea>
+        </div>
+
+        <div
+          id="manual-restaurant-modal-error"
+          class="hidden rounded-xl border border-red-400/40 bg-red-950/70 px-4 py-3 text-sm font-semibold text-red-100"
+        ></div>
+
+        <div class="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
+          <button
+            type="button"
+            id="cancel-manual-restaurant-btn"
+            class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+          >
+            Annuler
+          </button>
+
+          <button
+            type="submit"
+            id="submit-manual-restaurant-btn"
+            class="rounded-xl border border-gold/35 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+          >
+            Créer l’établissement
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const nameInput = modal.querySelector('#manual-restaurant-name');
+  const slugInput = modal.querySelector('#manual-restaurant-slug');
+  const cancelButton = modal.querySelector('#cancel-manual-restaurant-btn');
+  const form = modal.querySelector('#tapcarta-manual-restaurant-form');
+
+  let slugTouched = false;
+
+  slugInput.addEventListener('input', () => {
+    slugTouched = true;
+    slugInput.value = normalizeTapCartaManualSlug(slugInput.value);
+  });
+
+  nameInput.addEventListener('input', () => {
+    if (!slugTouched) {
+      slugInput.value = normalizeTapCartaManualSlug(nameInput.value);
+    }
+  });
+
+  cancelButton.addEventListener('click', () => {
+    modal.remove();
+  });
+
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      modal.remove();
+    }
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (typeof createManualRestaurantFromAdmin !== 'function') {
+      const errorBox = modal.querySelector('#manual-restaurant-modal-error');
+      errorBox.textContent = 'La fonction de création Supabase sera ajoutée à l’étape suivante.';
+      errorBox.classList.remove('hidden');
+      return;
+    }
+
+    await createManualRestaurantFromAdmin(form, modal);
+  });
+
+  setTimeout(() => {
+    nameInput.focus();
+  }, 80);
 }
 
 function showTapCartaManualActivationModal(request) {
