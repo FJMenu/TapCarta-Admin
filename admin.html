@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.3.4';
+  const APP_VERSION = 'V2.3.4.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -249,6 +249,7 @@
         <option value="setup">En création</option>
         <option value="special">Vitrines / pilotes / partenaires</option>
         <option value="suspended">Suspendus / rejetés</option>
+        <option value="trash">Corbeille</option>
         <option value="light">Pack Light</option>
         <option value="standard">Pack Standard</option>
         <option value="plus">Pack Plus</option>
@@ -6014,6 +6015,8 @@ async function loadRestaurantData(id) {
       system_activated_at,
       validated_at,
       planned_commercial_activation_date,
+      archived_at,
+      archived_reason,
       created_at,
       updated_at
     `)
@@ -6590,6 +6593,8 @@ async function loadRestaurantsIndex() {
       system_activated_at,
       validated_at,
       planned_commercial_activation_date,
+      archived_at,
+      archived_reason,
       created_at,
       updated_at
     `)
@@ -6705,6 +6710,86 @@ async function loadRestaurantsIndex() {
   }
 }
 
+async function archiveEstablishmentFromAdmin(restaurantId) {
+  if (!restaurantId) return false;
+
+  const restaurant = restaurantsIndex.find(item => item.id === restaurantId);
+
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Mettre cet établissement à la corbeille ?',
+    message: `L’établissement "${restaurant?.name || 'sélectionné'}" disparaîtra de la vue normale, mais pourra être restauré depuis le filtre Corbeille.`,
+    confirmLabel: 'Mettre à la corbeille',
+    cancelLabel: 'Annuler',
+    danger: true
+  });
+
+  if (!confirmed) return false;
+
+  const nowIso = new Date().toISOString();
+
+  const { error } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      status: 'archived_test',
+      archived_at: nowIso,
+      archived_reason: 'Mise à la corbeille depuis Admin',
+      updated_at: nowIso
+    })
+    .eq('id', restaurantId);
+
+  if (error) {
+    console.error('Erreur mise à la corbeille établissement:', error);
+    alert('Erreur pendant la mise à la corbeille.');
+    return false;
+  }
+
+  if (currentRestaurantId === restaurantId) {
+    currentRestaurantId = null;
+    currentRestaurantData = null;
+  }
+
+  await loadRestaurantsIndex();
+  return true;
+}
+
+async function restoreEstablishmentFromAdmin(restaurantId) {
+  if (!restaurantId) return false;
+
+  const restaurant = restaurantsIndex.find(item => item.id === restaurantId);
+
+  const confirmed = await showTapCartaConfirmModal({
+    title: 'Restaurer cet établissement ?',
+    message: `L’établissement "${restaurant?.name || 'sélectionné'}" sera remis en préparation et réapparaîtra dans la vue normale.`,
+    confirmLabel: 'Restaurer',
+    cancelLabel: 'Annuler',
+    danger: false
+  });
+
+  if (!confirmed) return false;
+
+  const nowIso = new Date().toISOString();
+
+  const { error } = await tapCartaSupabase
+    .from('restaurants')
+    .update({
+      status: 'setup_in_progress',
+      archived_at: null,
+      archived_reason: null,
+      updated_at: nowIso
+    })
+    .eq('id', restaurantId);
+
+  if (error) {
+    console.error('Erreur restauration établissement:', error);
+    alert('Erreur pendant la restauration.');
+    return false;
+  }
+
+  await loadRestaurantsIndex();
+  await loadRestaurantData(restaurantId);
+  return true;
+}
+
 function renderEstablishmentsList() {
   const list = document.getElementById('establishments-list');
   const filter = document.getElementById('establishments-filter');
@@ -6722,7 +6807,7 @@ function renderEstablishmentsList() {
     manual: 'Activation manuelle'
   };
 
-  const statusLabels = {
+   const statusLabels = {
     lead: 'Lead',
     join_requested: 'Demande reçue',
     signed_pending_review: 'Signature à vérifier',
@@ -6731,10 +6816,21 @@ function renderEstablishmentsList() {
     setup_in_progress: 'En création',
     full_active: 'Actif',
     suspended: 'Suspendu',
-    rejected: 'Refusé'
+    rejected: 'Refusé',
+    archived_test: 'Corbeille'
   };
 
   const filteredRestaurants = restaurantsIndex.filter(restaurant => {
+    const isArchived = restaurant.status === 'archived_test';
+
+    if (selectedFilter === 'trash') {
+      return isArchived;
+    }
+
+    if (isArchived) {
+      return false;
+    }
+
     if (selectedFilter === 'all') return true;
 
     if (selectedFilter === 'active') {
@@ -6742,7 +6838,7 @@ function renderEstablishmentsList() {
     }
 
     if (selectedFilter === 'setup') {
-      return ['setup_in_progress', 'waiting_assets', 'signed_pending_review', 'join_requested'].includes(restaurant.status);
+      return ['setup_in_progress', 'waiting_assets', 'signed_pending_review', 'join_requested', 'lead'].includes(restaurant.status);
     }
 
     if (selectedFilter === 'special') {
@@ -6776,6 +6872,10 @@ function renderEstablishmentsList() {
 
     if (['suspended', 'rejected'].includes(status)) {
       return 'border-red-400/30 bg-red-500/10 text-red-300';
+    }
+
+    if (status === 'archived_test') {
+      return 'border-red-400/35 bg-red-500/10 text-red-200';
     }
 
     return 'border-white/10 bg-white/[0.03] text-cream/70';
@@ -6940,52 +7040,76 @@ function renderEstablishmentsList() {
             }
 
             ${
-              restoUrl
+              restaurant.status === 'archived_test'
                 ? `
-                  <a
-                    href="${escapeTapCartaHtml(restoUrl)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-center text-sm font-semibold text-emerald-300"
-                  >
-                    Ouvrir Resto
-                  </a>
-
                   <button
                     type="button"
-                    data-action="copy-resto-link"
+                    data-action="restore-establishment"
                     data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
-                    class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+                    class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-300"
                   >
-                    Copier lien Resto
-                  </button>
-
-                  <button
-                    type="button"
-                    data-action="regenerate-resto-link"
-                    data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
-                    class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
-                  >
-                    Régénérer lien
-                  </button>
-
-                  <button
-                    type="button"
-                    data-action="revoke-resto-link"
-                    data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
-                    class="rounded-xl border border-red-400/35 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
-                  >
-                    Révoquer accès
+                    Restaurer
                   </button>
                 `
                 : `
+                  ${
+                    restoUrl
+                      ? `
+                        <a
+                          href="${escapeTapCartaHtml(restoUrl)}"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-center text-sm font-semibold text-emerald-300"
+                        >
+                          Ouvrir Resto
+                        </a>
+
+                        <button
+                          type="button"
+                          data-action="copy-resto-link"
+                          data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
+                          class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+                        >
+                          Copier lien Resto
+                        </button>
+
+                        <button
+                          type="button"
+                          data-action="regenerate-resto-link"
+                          data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
+                          class="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300"
+                        >
+                          Régénérer lien
+                        </button>
+
+                        <button
+                          type="button"
+                          data-action="revoke-resto-link"
+                          data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
+                          class="rounded-xl border border-red-400/35 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
+                        >
+                          Révoquer accès
+                        </button>
+                      `
+                      : `
+                        <button
+                          type="button"
+                          data-action="generate-resto-link"
+                          data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
+                          class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+                        >
+                          Générer lien Resto
+                        </button>
+                      `
+                  }
+
                   <button
                     type="button"
-                    data-action="generate-resto-link"
+                    data-action="archive-establishment"
                     data-restaurant-id="${escapeTapCartaHtml(restaurant.id)}"
-                    class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+                    class="rounded-xl border border-red-400/35 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-300"
                   >
-                    Générer lien Resto
+                    Mettre à la corbeille
                   </button>
                 `
             }
