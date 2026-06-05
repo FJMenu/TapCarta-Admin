@@ -1835,6 +1835,195 @@ function normalizeTapCartaManualSlug(value) {
     .slice(0, 80);
 }
 
+function buildTapCartaPublicUrlFromSlug(slug) {
+  const safeSlug = normalizeTapCartaManualSlug(slug);
+  if (!safeSlug) return '';
+  return `https://tapcarta.com/${safeSlug}/`;
+}
+
+function getManualRestaurantSelectedPackLabel(packCode) {
+  const pack = getCommercialPackByCode(packCode);
+  return pack?.translated_name || pack?.name || String(packCode || 'Light');
+}
+
+async function createManualRestaurantFromAdmin(form, modal) {
+  const errorBox = modal.querySelector('#manual-restaurant-modal-error');
+  const submitButton = modal.querySelector('#submit-manual-restaurant-btn');
+
+  if (errorBox) {
+    errorBox.textContent = '';
+    errorBox.classList.add('hidden');
+  }
+
+  const formData = new FormData(form);
+
+  const restaurantName = String(formData.get('restaurantName') || '').trim();
+  const restaurantSlug = normalizeTapCartaManualSlug(formData.get('restaurantSlug') || '');
+  const restaurantPack = String(formData.get('restaurantPack') || 'light').trim() || 'light';
+  const restaurantStatus = String(formData.get('restaurantStatus') || 'lead').trim() || 'lead';
+  const internalType = String(formData.get('internalType') || 'manual').trim() || 'manual';
+  const internalNote = String(formData.get('internalNote') || '').trim();
+
+  if (!restaurantName) {
+    if (errorBox) {
+      errorBox.textContent = 'Le nom du restaurant est obligatoire.';
+      errorBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (!restaurantSlug) {
+    if (errorBox) {
+      errorBox.textContent = 'Le slug public est obligatoire.';
+      errorBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(restaurantSlug)) {
+    if (errorBox) {
+      errorBox.textContent = 'Le slug doit contenir uniquement des lettres, chiffres et tirets.';
+      errorBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Création en cours...';
+    submitButton.classList.add('opacity-60', 'cursor-not-allowed');
+  }
+
+  try {
+    const nowIso = new Date().toISOString();
+    const publicUrl = buildTapCartaPublicUrlFromSlug(restaurantSlug);
+    const packLabel = getManualRestaurantSelectedPackLabel(restaurantPack);
+
+    const { data: existingRestaurant, error: existingError } = await tapCartaSupabase
+      .from('restaurants')
+      .select('id, name, slug')
+      .eq('slug', restaurantSlug)
+      .maybeSingle();
+
+    if (existingError) {
+      throw existingError;
+    }
+
+    if (existingRestaurant?.id) {
+      throw new Error(`Ce slug est déjà utilisé par : ${existingRestaurant.name || existingRestaurant.slug}`);
+    }
+
+    const restaurantPayload = {
+      name: restaurantName,
+      slug: restaurantSlug,
+      status: restaurantStatus,
+      pack_code: restaurantPack,
+      public_url: publicUrl,
+      public_page_status: 'construction',
+      menu_publication_status: 'not_started',
+      activation_mode: internalType,
+      activation_reason: internalNote || `Création manuelle Admin — ${internalType}`,
+      updated_at: nowIso
+    };
+
+    const { data: insertedRestaurant, error: restaurantError } = await tapCartaSupabase
+      .from('restaurants')
+      .insert(restaurantPayload)
+      .select('id, name, slug, status, pack_code, public_url')
+      .single();
+
+    if (restaurantError) {
+      throw restaurantError;
+    }
+
+    if (!insertedRestaurant?.id) {
+      throw new Error('Restaurant créé, mais aucun identifiant Supabase retourné.');
+    }
+
+    const restaurantId = insertedRestaurant.id;
+
+    const defaultModules = {
+      ordering: restaurantPack === 'plus',
+      booking: restaurantPack === 'plus',
+      preorderIndicative: restaurantPack === 'plus',
+      googleReviews: restaurantPack !== 'light',
+      whatsapp: true,
+      phone: true,
+      directions: true
+    };
+
+    const { error: settingsError } = await tapCartaSupabase
+      .from('restaurant_settings')
+      .insert({
+        restaurant_id: restaurantId,
+        active_languages: ['fr', 'es', 'en', 'nl'],
+        modules: defaultModules,
+        modules_json: {
+          ordering: defaultModules.ordering ? 'active' : 'hidden',
+          booking: defaultModules.booking ? 'active' : 'hidden',
+          whatsapp: 'active',
+          phone: 'active',
+          directions: 'active',
+          googleReviews: defaultModules.googleReviews ? 'active' : 'hidden'
+        },
+        contact_json: {},
+        customer_messages_json: [],
+        updated_at: nowIso
+      });
+
+    if (settingsError) {
+      throw new Error(`Restaurant créé, mais erreur restaurant_settings : ${settingsError.message}`);
+    }
+
+    const { error: onboardingError } = await tapCartaSupabase
+      .from('onboarding_assets')
+      .insert({
+        restaurant_id: restaurantId,
+        logo_status: 'missing',
+        menu_status: 'missing',
+        translations_status: 'missing',
+        photos_status: 'missing',
+        legal_info_status: 'missing',
+        qr_status: 'not_prepared',
+        page_status: 'not_started',
+        final_activation_status: 'not_checked',
+        notes: [
+          `Création manuelle Admin.`,
+          `Type interne : ${internalType}.`,
+          `Pack initial : ${packLabel}.`,
+          internalNote ? `Note : ${internalNote}` : ''
+        ].filter(Boolean).join('\n'),
+        updated_at: nowIso
+      });
+
+    if (onboardingError) {
+      throw new Error(`Restaurant et paramètres créés, mais erreur onboarding_assets : ${onboardingError.message}`);
+    }
+
+    if (modal) {
+      modal.remove();
+    }
+
+    await loadRestaurantsIndex();
+    await loadRestaurantData(restaurantId);
+
+    alert(`Établissement créé : ${restaurantName}`);
+  } catch (error) {
+    console.error('Erreur création établissement manuel:', error);
+
+    if (errorBox) {
+      errorBox.textContent = error?.message || 'Erreur pendant la création de l’établissement.';
+      errorBox.classList.remove('hidden');
+    }
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Créer l’établissement';
+      submitButton.classList.remove('opacity-60', 'cursor-not-allowed');
+    }
+  }
+}
+
 function showTapCartaManualRestaurantModal() {
   const existingModal = document.getElementById('tapcarta-manual-restaurant-modal');
   if (existingModal) existingModal.remove();
