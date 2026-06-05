@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.3.3';
+  const APP_VERSION = 'V2.3.3.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -6782,16 +6782,45 @@ function renderEstablishmentsList() {
   };
 
   const getOnboardingSummary = (onboarding) => {
-    const missing = [
-      onboarding?.menu_status === 'missing' || !onboarding?.menu_status ? 'menu' : '',
-      onboarding?.legal_info_status === 'missing' || !onboarding?.legal_info_status ? 'infos légales' : '',
-      onboarding?.gocardless_status &&
-      !['validated', 'not_required', 'authorized_pending'].includes(onboarding.gocardless_status)
-        ? 'Paiement'
-        : ''
-    ].filter(Boolean);
+    const missing = [];
 
-    return missing.length ? `Manque : ${missing.join(', ')}` : 'Dossier prêt / non bloquant';
+    if (!onboarding || typeof onboarding !== 'object') {
+      return 'Dossier incomplet — non bloquant';
+    }
+
+    if (onboarding.logo_status === 'missing' || !onboarding.logo_status) {
+      missing.push('logo');
+    }
+
+    if (onboarding.menu_status === 'missing' || !onboarding.menu_status) {
+      missing.push('menu');
+    }
+
+    if (onboarding.translations_status === 'missing' || !onboarding.translations_status) {
+      missing.push('traductions');
+    }
+
+    if (onboarding.legal_info_status === 'missing' || !onboarding.legal_info_status) {
+      missing.push('infos légales');
+    }
+
+    if (onboarding.qr_status === 'not_prepared' || !onboarding.qr_status) {
+      missing.push('QR');
+    }
+
+    if (onboarding.page_status === 'not_started' || !onboarding.page_status) {
+      missing.push('page');
+    }
+
+    if (onboarding.final_activation_status === 'blocked') {
+      missing.push('activation bloquée');
+    }
+
+    if (!missing.length) {
+      return 'Dossier prêt / non bloquant';
+    }
+
+    return `Manque : ${missing.slice(0, 4).join(', ')}${missing.length > 4 ? '…' : ''} — non bloquant`;
   };
 
   list.innerHTML = filteredRestaurants.map(restaurant => {
