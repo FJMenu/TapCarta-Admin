@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.5.1';
+  const APP_VERSION = 'V2.3.6.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -1870,10 +1870,47 @@ function normalizeTapCartaManualSlug(value) {
     .slice(0, 80);
 }
 
+function buildTapCartaPublicSlugFromNameAndCity(name, city) {
+  return normalizeTapCartaManualSlug([name, city].filter(Boolean).join('-'));
+}
+
 function buildTapCartaPublicUrlFromSlug(slug) {
   const safeSlug = normalizeTapCartaManualSlug(slug);
   if (!safeSlug) return '';
   return `https://tapcarta.com/${safeSlug}/`;
+}
+
+function buildTapCartaQrUrlFromCode(qrCode) {
+  const safeCode = normalizeTapCartaManualSlug(qrCode);
+  if (!safeCode) return '';
+  return `https://tapcarta.com/r/${safeCode}/`;
+}
+
+function generateTapCartaStableQrCode(name = '', city = '') {
+  const seed = normalizeTapCartaManualSlug(`${name}-${city}`);
+  const prefix =
+    seed
+      .split('-')
+      .filter(Boolean)
+      .map(part => part[0])
+      .join('')
+      .slice(0, 4) || 'tc';
+
+  const bytes = new Uint8Array(5);
+
+  if (window.crypto && window.crypto.getRandomValues) {
+    window.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  const randomPart = Array.from(bytes)
+    .map(byte => (byte % 36).toString(36))
+    .join('');
+
+  return normalizeTapCartaManualSlug(`${prefix}-${randomPart}`);
 }
 
 function getManualRestaurantSelectedPackLabel(packCode) {
@@ -1893,7 +1930,10 @@ async function createManualRestaurantFromAdmin(form, modal) {
   const formData = new FormData(form);
 
   const restaurantName = String(formData.get('restaurantName') || '').trim();
-  const restaurantSlug = normalizeTapCartaManualSlug(formData.get('restaurantSlug') || '');
+  const restaurantCity = String(formData.get('restaurantCity') || '').trim();
+  const restaurantSlug = normalizeTapCartaManualSlug(
+    formData.get('restaurantSlug') || buildTapCartaPublicSlugFromNameAndCity(restaurantName, restaurantCity)
+  );
   const restaurantPack = String(formData.get('restaurantPack') || 'light').trim() || 'light';
   const restaurantStatus = String(formData.get('restaurantStatus') || 'setup_in_progress').trim() || 'setup_in_progress';
   const internalType = String(formData.get('internalType') || 'manual').trim() || 'manual';
@@ -1902,6 +1942,14 @@ async function createManualRestaurantFromAdmin(form, modal) {
   if (!restaurantName) {
     if (errorBox) {
       errorBox.textContent = 'Le nom du restaurant est obligatoire.';
+      errorBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (!restaurantCity) {
+    if (errorBox) {
+      errorBox.textContent = 'La ville / le lieu du restaurant est obligatoire pour générer l’URL publique.';
       errorBox.classList.remove('hidden');
     }
     return;
@@ -1951,12 +1999,43 @@ async function createManualRestaurantFromAdmin(form, modal) {
       throw new Error(`Ce slug est déjà utilisé par : ${existingRestaurant.name || existingRestaurant.slug}`);
     }
 
+    let qrCode = '';
+    let qrUrl = '';
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidateCode = generateTapCartaStableQrCode(restaurantName, restaurantCity);
+      const candidateUrl = buildTapCartaQrUrlFromCode(candidateCode);
+
+      const { data: existingQr, error: qrCheckError } = await tapCartaSupabase
+        .from('restaurants')
+        .select('id, qr_code')
+        .eq('qr_code', candidateCode)
+        .maybeSingle();
+
+      if (qrCheckError) {
+        throw qrCheckError;
+      }
+
+      if (!existingQr?.id) {
+        qrCode = candidateCode;
+        qrUrl = candidateUrl;
+        break;
+      }
+    }
+
+    if (!qrCode || !qrUrl) {
+      throw new Error('Impossible de générer un code QR durable unique. Réessaie.');
+    }
+
     const restaurantPayload = {
       name: restaurantName,
+      city: restaurantCity,
       slug: restaurantSlug,
       status: restaurantStatus,
       pack_code: normalizedPack,
       public_url: publicUrl,
+      qr_code: qrCode,
+      qr_url: qrUrl,
       public_page_status: 'construction',
       menu_publication_status: 'not_started',
       activation_mode: internalType,
@@ -1967,7 +2046,7 @@ async function createManualRestaurantFromAdmin(form, modal) {
     const { data: insertedRestaurant, error: restaurantError } = await tapCartaSupabase
       .from('restaurants')
       .insert(restaurantPayload)
-      .select('id, name, slug, status, pack_code, public_url')
+      .select('id, name, city, slug, status, pack_code, public_url, qr_code, qr_url')
       .single();
 
     if (restaurantError) {
@@ -2026,31 +2105,6 @@ async function createManualRestaurantFromAdmin(form, modal) {
       throw new Error(`Restaurant créé, mais erreur restaurant_settings : ${settingsError.message}`);
     }
 
-    const { error: onboardingError } = await tapCartaSupabase
-      .from('onboarding_assets')
-      .insert({
-        restaurant_id: restaurantId,
-        logo_status: 'missing',
-        menu_status: 'missing',
-        translations_status: 'missing',
-        photos_status: 'missing',
-        legal_info_status: 'missing',
-        qr_status: 'not_prepared',
-        page_status: 'not_started',
-        final_activation_status: 'not_checked',
-        notes: [
-          `Création manuelle Admin.`,
-          `Type interne : ${internalType}.`,
-          `Pack initial : ${packLabel}.`,
-          internalNote ? `Note : ${internalNote}` : ''
-        ].filter(Boolean).join('\n'),
-        updated_at: nowIso
-      });
-
-    if (onboardingError) {
-      throw new Error(`Restaurant et paramètres créés, mais erreur onboarding_assets : ${onboardingError.message}`);
-    }
-
     if (modal) {
       modal.remove();
     }
@@ -2058,7 +2112,25 @@ async function createManualRestaurantFromAdmin(form, modal) {
     await loadRestaurantsIndex();
     await loadRestaurantData(restaurantId);
 
-    alert(`Établissement créé : ${restaurantName}`);
+    try {
+      await navigator.clipboard.writeText(qrUrl);
+    } catch (clipboardError) {
+      console.warn('Copie automatique URL QR impossible:', clipboardError);
+    }
+
+    await showTapCartaInfoModal({
+      title: 'Établissement créé',
+      message: `
+        <div class="space-y-2">
+          <div><strong>${restaurantName}</strong> a été créé en pack <strong>${packLabel}</strong>.</div>
+          <div>URL publique : <strong>${publicUrl}</strong></div>
+          <div>URL QR durable : <strong>${qrUrl}</strong></div>
+          <div class="text-cream/60">L’URL QR durable a été copiée automatiquement si le navigateur l’a autorisé. Génère le QR encadré avec cette URL, pas avec l’URL publique.</div>
+        </div>
+      `,
+      buttonLabel: 'Compris',
+      type: 'success'
+    });
   } catch (error) {
     console.error('Erreur création établissement manuel:', error);
 
@@ -2084,12 +2156,12 @@ function showTapCartaManualRestaurantModal() {
   modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4';
 
   modal.innerHTML = `
-    <div class="w-full max-w-2xl rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
+    <div class="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-gold/25 bg-[#121212] p-6 shadow-2xl">
       <div class="mb-5">
         <div class="font-display text-2xl text-cream">Créer un établissement manuel</div>
         <div class="mt-2 text-sm leading-relaxed text-cream/70">
-          Création super-admin sans demande publique. Les données manquantes seront signalées plus tard,
-          mais elles ne bloquent pas la création.
+          Création super-admin sans demande publique. Pour les nouvelles créations, l’URL publique utilise le nom et la ville,
+          tandis que l’URL QR durable reste indépendante du nom et du lieu.
         </div>
       </div>
 
@@ -2104,8 +2176,25 @@ function showTapCartaManualRestaurantModal() {
             type="text"
             autocomplete="off"
             class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
-            placeholder="Ex. La Sarten Manilva"
+            placeholder="Ex. La Sarten"
           >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+            Ville / lieu *
+          </label>
+          <input
+            id="manual-restaurant-city"
+            name="restaurantCity"
+            type="text"
+            autocomplete="off"
+            class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
+            placeholder="Ex. Manilva, Sabinillas, Estepona..."
+          >
+          <p class="mt-2 text-xs text-cream/45">
+            Sert à générer l’URL publique lisible : nom-du-restaurant-ville.
+          </p>
         </div>
 
         <div>
@@ -2121,19 +2210,29 @@ function showTapCartaManualRestaurantModal() {
             placeholder="la-sarten-manilva"
           >
           <p class="mt-2 text-xs text-cream/45">
-            Utilisé pour l’URL publique propre. Exemple : tapcarta.com/la-sarten-manilva/
+            URL publique : tapcarta.com/<span id="manual-restaurant-public-preview">nom-resto-ville</span>/
           </p>
         </div>
 
-        <div class="grid gap-3 md:grid-cols-2">
+        <div class="rounded-2xl border border-gold/20 bg-gold/10 p-4">
+          <div class="text-xs font-bold uppercase tracking-wide text-gold">
+            QR durable
+          </div>
+          <div class="mt-2 text-sm leading-relaxed text-cream/70">
+            Admin générera automatiquement une URL QR durable du type
+            <strong>tapcarta.com/r/code-stable/</strong>. Utilise cette URL pour générer le QR encadré TapCarta.
+            Le QR ne dépendra pas du nom ni de la ville.
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
           <div>
             <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
-              Pack initial
+              Pack
             </label>
             <select
-              id="manual-restaurant-pack"
               name="restaurantPack"
-              class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
+              class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
             >
               <option value="light">Light</option>
               <option value="standard">Standard</option>
@@ -2146,48 +2245,47 @@ function showTapCartaManualRestaurantModal() {
               Statut initial
             </label>
             <select
-              id="manual-restaurant-status"
               name="restaurantStatus"
-              class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
+              class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
             >
-              <option value="lead">En préparation</option>
-              <option value="active">Actif</option>
-              <option value="inactive">Inactif</option>
+              <option value="setup_in_progress">En création</option>
+              <option value="waiting_assets">Éléments attendus</option>
+              <option value="light_active">Light actif</option>
+              <option value="full_active">Actif</option>
             </select>
           </div>
         </div>
 
-        <div>
-          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
-            Type d’activation interne
-          </label>
-          <select
-            id="manual-restaurant-internal-type"
-            name="internalType"
-            class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none"
-          >
-            <option value="manual">Création manuelle</option>
-            <option value="free_test">Restaurant test</option>
-            <option value="showcase">Restaurant vitrine</option>
-            <option value="partner">Partenaire</option>
-            <option value="promo">Promo / gratuité temporaire</option>
-          </select>
-          <p class="mt-2 text-xs text-cream/45">
-            Cette information servira au suivi Admin. Elle ne remplace pas le statut public de la page.
-          </p>
-        </div>
+        <div class="grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+              Type d’activation
+            </label>
+            <select
+              name="internalType"
+              class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
+            >
+              <option value="manual">Activation manuelle</option>
+              <option value="paid">Payant</option>
+              <option value="free_test">Pilote gratuit</option>
+              <option value="promo">Promo</option>
+              <option value="partner">Partenaire</option>
+              <option value="showcase">Vitrine</option>
+            </select>
+          </div>
 
-        <div>
-          <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
-            Note interne facultative
-          </label>
-          <textarea
-            id="manual-restaurant-note"
-            name="internalNote"
-            rows="3"
-            class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
-            placeholder="Ex. restaurant créé manuellement pour test, vitrine ou promo temporaire..."
-          ></textarea>
+          <div>
+            <label class="mb-2 block text-xs font-semibold uppercase tracking-wide text-cream/45">
+              Note interne
+            </label>
+            <input
+              name="internalNote"
+              type="text"
+              autocomplete="off"
+              class="w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-cream outline-none focus:border-gold/60"
+              placeholder="Ex. création urgente QR client"
+            >
+          </div>
         </div>
 
         <div
@@ -2219,22 +2317,35 @@ function showTapCartaManualRestaurantModal() {
   document.body.appendChild(modal);
 
   const nameInput = modal.querySelector('#manual-restaurant-name');
+  const cityInput = modal.querySelector('#manual-restaurant-city');
   const slugInput = modal.querySelector('#manual-restaurant-slug');
+  const publicPreview = modal.querySelector('#manual-restaurant-public-preview');
   const cancelButton = modal.querySelector('#cancel-manual-restaurant-btn');
   const form = modal.querySelector('#tapcarta-manual-restaurant-form');
 
   let slugTouched = false;
 
+  const updateAutoSlug = () => {
+    if (!slugTouched) {
+      slugInput.value = buildTapCartaPublicSlugFromNameAndCity(nameInput.value, cityInput.value);
+    }
+
+    if (publicPreview) {
+      publicPreview.textContent = slugInput.value || 'nom-resto-ville';
+    }
+  };
+
   slugInput.addEventListener('input', () => {
     slugTouched = true;
     slugInput.value = normalizeTapCartaManualSlug(slugInput.value);
-  });
 
-  nameInput.addEventListener('input', () => {
-    if (!slugTouched) {
-      slugInput.value = normalizeTapCartaManualSlug(nameInput.value);
+    if (publicPreview) {
+      publicPreview.textContent = slugInput.value || 'nom-resto-ville';
     }
   });
+
+  nameInput.addEventListener('input', updateAutoSlug);
+  cityInput.addEventListener('input', updateAutoSlug);
 
   cancelButton.addEventListener('click', () => {
     modal.remove();
