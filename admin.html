@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.6.1';
+  const APP_VERSION = 'V2.3.6.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -387,6 +387,45 @@
     class="w-full rounded-xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-cream outline-none"
     placeholder="https://tapcarta.com/la-sarten-manilva/"
   >
+  <p class="mt-2 text-xs text-cream/45">
+    URL lisible modifiable : nom du restaurant + ville.
+  </p>
+</div>
+
+<div class="rounded-2xl border border-gold/18 bg-black/15 px-4 py-4">
+  <div class="text-xs uppercase tracking-wide text-gold/80 font-bold">
+    URL QR durable
+  </div>
+
+  <input
+    id="field-qr-url"
+    type="text"
+    readonly
+    class="mt-3 w-full rounded-xl border border-gold/20 bg-black/25 px-4 py-3 text-sm text-gold outline-none"
+    placeholder="https://tapcarta.com/r/?c=code-stable"
+  >
+
+  <div class="mt-3 flex flex-col gap-2 md:flex-row">
+    <button
+      id="copy-qr-url-btn"
+      type="button"
+      class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+    >
+      Copier l’URL QR
+    </button>
+
+    <button
+      id="test-qr-url-btn"
+      type="button"
+      class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/80"
+    >
+      Tester l’URL QR
+    </button>
+  </div>
+
+  <p class="mt-2 text-xs leading-relaxed text-cream/45">
+    Utilise cette URL pour générer le QR encadré TapCarta. Cette URL ne doit pas changer si le nom, la ville ou l’adresse du restaurant changent.
+  </p>
 </div>
 
 <div class="rounded-2xl border border-gold/18 bg-black/15 px-4 py-4">
@@ -4724,6 +4763,15 @@ function fillForm(data) {
     data.technical?.clientMenuUrl ||
     '';
 
+  const qrUrlField = document.getElementById('field-qr-url');
+  if (qrUrlField) {
+    qrUrlField.value =
+      data.links?.qrUrl ||
+      data.links?.qrPublicUrl ||
+      data.technical?.qrUrl ||
+      '';
+  }
+
   const logoUrlField = document.getElementById('field-logo-url');
   const logoPreview = document.getElementById('field-logo-preview');
   const logoEmpty = document.getElementById('field-logo-empty');
@@ -5688,7 +5736,59 @@ function bindFormEvents() {
     currentRestaurantData.links.publicPage = e.target.value.trim();
     markDirty();
   });
+  const copyQrUrlButton = document.getElementById('copy-qr-url-btn');
+  if (copyQrUrlButton) {
+    copyQrUrlButton.addEventListener('click', async () => {
+      const qrUrl = document.getElementById('field-qr-url')?.value?.trim();
 
+      if (!qrUrl) {
+        await showTapCartaInfoModal({
+          title: 'URL QR absente',
+          message: 'Aucune URL QR durable n’est disponible pour cet établissement.',
+          buttonLabel: 'Compris',
+          type: 'warning'
+        });
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(qrUrl);
+
+        await showTapCartaInfoModal({
+          title: 'URL QR copiée',
+          message: `L’URL QR durable a été copiée :<br><strong>${qrUrl}</strong>`,
+          buttonLabel: 'OK',
+          type: 'success'
+        });
+      } catch (error) {
+        await showTapCartaInfoModal({
+          title: 'Copie impossible',
+          message: `Copie automatique impossible. Copie manuellement cette URL :<br><strong>${qrUrl}</strong>`,
+          buttonLabel: 'Compris',
+          type: 'warning'
+        });
+      }
+    });
+  }
+
+  const testQrUrlButton = document.getElementById('test-qr-url-btn');
+  if (testQrUrlButton) {
+    testQrUrlButton.addEventListener('click', async () => {
+      const qrUrl = document.getElementById('field-qr-url')?.value?.trim();
+
+      if (!qrUrl) {
+        await showTapCartaInfoModal({
+          title: 'URL QR absente',
+          message: 'Aucune URL QR durable n’est disponible pour cet établissement.',
+          buttonLabel: 'Compris',
+          type: 'warning'
+        });
+        return;
+      }
+
+      window.open(qrUrl, '_blank', 'noopener,noreferrer');
+    });
+  }
   const logoUrlField = document.getElementById('field-logo-url');
   if (logoUrlField) {
     logoUrlField.addEventListener('input', (e) => {
