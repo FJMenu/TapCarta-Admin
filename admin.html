@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.6.2';
+  const APP_VERSION = 'V2.3.6.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -6250,10 +6250,13 @@ async function loadRestaurantData(id) {
     .select(`
       id,
       name,
+      city,
       slug,
       status,
       pack_code,
       public_url,
+      qr_code,
+      qr_url,
       resto_url,
       logo_storage_path,
       logo_url,
@@ -6447,7 +6450,10 @@ async function loadRestaurantData(id) {
     },
     links: {
       slug: restaurant.slug || '',
+      city: restaurant.city || '',
       publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || ''),
+      qrCode: restaurant.qr_code || '',
+      qrUrl: restaurant.qr_url || '',
       restoUrl: restaurant.resto_url || '',
       logoStoragePath: restaurant.logo_storage_path || '',
       logoUrl: restaurant.logo_url || '',
