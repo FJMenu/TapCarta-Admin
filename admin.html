@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.6.3';
+  const APP_VERSION = 'V2.3.6.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -3280,42 +3280,60 @@ function escapeTapCartaHtml(value) {
 }
 
 function normalizeContractData(contract) {
+  const emptyContract = {
+    id: '',
+    status: '',
+    contract_number: '',
+    contract_version: '',
+    contract_type: '',
+    pack_code: '',
+    monthly_price: null,
+    currency: 'EUR',
+    official_language: '',
+    language_displayed: '',
+    signature_language: '',
+    signed_at: '',
+    created_at: '',
+    pdf_storage_path: '',
+    pdf_url: '',
+    pdf_generated_at: '',
+    pdf_sent_at: '',
+    planned_commercial_activation_date: '',
+    payment_status: '',
+    payment_provider: '',
+    signer_name: '',
+    company_name: '',
+    signer_role: '',
+    pdf_status: '',
+    pdf_generation_method: '',
+    pdf_generation_provider: '',
+    pdf_generation_error: '',
+    metadata: {},
+    is_free_contract: false,
+    free_reason: '',
+    free_start_date: '',
+    free_end_date: '',
+    free_no_auto_conversion: false
+  };
+
   if (!contract || typeof contract !== 'object') {
-    return {
-      id: '',
-      status: '',
-      contract_number: '',
-      contract_version: '',
-      contract_type: '',
-      pack_code: '',
-      monthly_price: null,
-      currency: 'EUR',
-      official_language: '',
-      language_displayed: '',
-      signature_language: '',
-      signed_at: '',
-      created_at: '',
-      pdf_storage_path: '',
-      pdf_url: '',
-      pdf_generated_at: '',
-      pdf_sent_at: '',
-      planned_commercial_activation_date: '',
-      payment_status: '',
-      payment_provider: '',
-      signer_name: '',
-      company_name: '',
-      signer_role: '',
-      pdf_status: '',
-      pdf_generation_method: '',
-      pdf_generation_provider: '',
-      pdf_generation_error: '',
-      metadata: {}
-    };
+    return emptyContract;
   }
 
   const metadata = contract.metadata && typeof contract.metadata === 'object'
     ? contract.metadata
     : {};
+
+  const contractType = String(contract.contract_type || '').trim().toLowerCase();
+  const paymentStatus = String(contract.payment_status || '').trim().toLowerCase();
+
+  const isFreeContract =
+    contractType === 'free' ||
+    (
+      Number(contract.monthly_price ?? 0) === 0 &&
+      paymentStatus === 'not_required' &&
+      Boolean(metadata.free_reason || metadata.free_start_date || metadata.free_end_date)
+    );
 
   return {
     id: contract.id || '',
@@ -3323,7 +3341,7 @@ function normalizeContractData(contract) {
     contract_number: contract.contract_number || '',
     contract_version: contract.contract_version || '',
     contract_type: contract.contract_type || '',
-    pack_code: contract.pack_code || '',
+    pack_code: contract.pack_code || metadata.free_pack_code || '',
     monthly_price: contract.monthly_price ?? null,
     currency: contract.currency || 'EUR',
     official_language: contract.official_language || metadata.official_contract_language || '',
@@ -3335,7 +3353,7 @@ function normalizeContractData(contract) {
     pdf_url: contract.pdf_url || '',
     pdf_generated_at: contract.pdf_generated_at || '',
     pdf_sent_at: contract.pdf_sent_at || '',
-    planned_commercial_activation_date: contract.planned_commercial_activation_date || '',
+    planned_commercial_activation_date: contract.planned_commercial_activation_date || metadata.free_start_date || '',
     payment_status: contract.payment_status || '',
     payment_provider: contract.payment_provider || '',
     signer_name: contract.signer_name || '',
@@ -3345,7 +3363,12 @@ function normalizeContractData(contract) {
     pdf_generation_method: contract.pdf_generation_method || '',
     pdf_generation_provider: contract.pdf_generation_provider || '',
     pdf_generation_error: contract.pdf_generation_error || '',
-    metadata
+    metadata,
+    is_free_contract: isFreeContract,
+    free_reason: metadata.free_reason || '',
+    free_start_date: metadata.free_start_date || '',
+    free_end_date: metadata.free_end_date || '',
+    free_no_auto_conversion: metadata.free_no_auto_conversion === true
   };
 }
 function renderContractBillingBlock(contract) {
