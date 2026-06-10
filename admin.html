@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.7.3';
+  const APP_VERSION = 'V2.3.7.4';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -3658,6 +3658,15 @@ function renderContractBillingBlock(contract) {
     <div class="grid gap-3 md:grid-cols-2">
       <button
         type="button"
+        data-action="complete-contract-legal-data"
+        data-contract-id="${escapeTapCartaHtml(normalizedContract.id)}"
+        class="rounded-xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-300 hover:bg-cyan-500/15"
+      >
+        Compléter données légales
+      </button>
+
+      <button
+        type="button"
         data-action="generate-contract-pdf"
         data-contract-id="${escapeTapCartaHtml(normalizedContract.id)}"
         class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold hover:bg-gold/15"
@@ -3682,7 +3691,14 @@ function renderContractBillingBlock(contract) {
     </div>
   `;
 
+  const completeLegalDataButton = summary.querySelector('[data-action="complete-contract-legal-data"]');
   const generatePdfButton = summary.querySelector('[data-action="generate-contract-pdf"]');
+
+  if (completeLegalDataButton) {
+    completeLegalDataButton.addEventListener('click', () => {
+      openCompleteContractLegalDataModal(normalizedContract);
+    });
+  }
 
   if (generatePdfButton) {
     generatePdfButton.addEventListener('click', async () => {
@@ -4275,6 +4291,318 @@ async function createFreeContractFromAdmin() {
       confirmButton.disabled = false;
       confirmButton.textContent = 'Créer le contrat gratuit';
       confirmButton.classList.remove('opacity-60');
+    }
+  }
+}
+function openCompleteContractLegalDataModal(contract) {
+  const normalizedContract = normalizeContractData(contract);
+  const metadata = normalizedContract.metadata && typeof normalizedContract.metadata === 'object'
+    ? normalizedContract.metadata
+    : {};
+
+  if (!normalizedContract.id) {
+    alert('Aucun contrat sélectionné.');
+    return;
+  }
+
+  document.getElementById('complete-contract-legal-data-modal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'complete-contract-legal-data-modal';
+  modal.className = 'fixed inset-0 z-[10090] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm';
+
+  const value = (input) => escapeTapCartaHtml(input || '');
+
+  modal.innerHTML = `
+    <div class="w-full max-w-2xl rounded-[28px] border border-cyan-400/30 bg-[#111111] p-5 text-cream shadow-2xl">
+      <div class="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <div class="text-xs font-bold uppercase tracking-wide text-cyan-300">
+            Données légales contrat
+          </div>
+          <h3 class="font-display mt-1 text-2xl font-bold text-cream">
+            Compléter les données légales
+          </h3>
+          <p class="mt-2 text-sm leading-relaxed text-cream/60">
+            Ces informations peuvent être ajoutées après la création du contrat brouillon. Elles sont obligatoires uniquement avant la génération PDF.
+          </p>
+        </div>
+
+        <button
+          id="close-contract-legal-data-modal-btn"
+          type="button"
+          class="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-semibold text-cream/70"
+        >
+          Fermer
+        </button>
+      </div>
+
+      <div class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">Type client</label>
+          <select
+            id="contract-legal-customer-type"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+            <option value="company" ${metadata.customer_type === 'company' ? 'selected' : ''}>Société / personne morale</option>
+            <option value="self_employed" ${metadata.customer_type === 'self_employed' ? 'selected' : ''}>Autónomo / personne physique</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">Email de facturation</label>
+          <input
+            id="contract-legal-billing-email"
+            type="email"
+            value="${value(metadata.billing_email || normalizedContract.signed_email)}"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">Client / raison sociale</label>
+          <input
+            id="contract-legal-client-legal-name"
+            type="text"
+            value="${value(metadata.client_legal_name || metadata.company_legal_name || normalizedContract.company_name)}"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">NIF / NIE / CIF client</label>
+          <input
+            id="contract-legal-client-tax-id"
+            type="text"
+            value="${value(metadata.client_tax_id || metadata.company_tax_id || metadata.tax_number || metadata.personal_tax_id)}"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">Nom du signataire</label>
+          <input
+            id="contract-legal-signer-name"
+            type="text"
+            value="${value(metadata.signer_name || normalizedContract.signer_name)}"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">Rôle du signataire</label>
+          <input
+            id="contract-legal-signer-role"
+            type="text"
+            value="${value(metadata.signer_role || normalizedContract.signer_role)}"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">NIF / NIE du signataire</label>
+          <input
+            id="contract-legal-signer-tax-id"
+            type="text"
+            value="${value(metadata.signer_tax_id)}"
+            class="w-full rounded-xl border border-cyan-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+      </div>
+
+      <div id="contract-legal-data-status" class="mt-4 text-sm text-cream/55">
+        Complète les données puis enregistre.
+      </div>
+
+      <div class="mt-5 grid gap-3 md:grid-cols-2">
+        <button
+          id="cancel-contract-legal-data-btn"
+          type="button"
+          class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm font-semibold text-cream/75"
+        >
+          Annuler
+        </button>
+
+        <button
+          id="save-contract-legal-data-btn"
+          type="button"
+          class="rounded-xl border border-cyan-400/40 bg-cyan-500/15 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-cyan-500/20"
+        >
+          Enregistrer les données légales
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeModal = () => modal.remove();
+
+  document.getElementById('close-contract-legal-data-modal-btn')?.addEventListener('click', closeModal);
+  document.getElementById('cancel-contract-legal-data-btn')?.addEventListener('click', closeModal);
+  document.getElementById('save-contract-legal-data-btn')?.addEventListener('click', async () => {
+    await saveContractLegalDataFromAdmin(normalizedContract.id);
+  });
+
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+async function saveContractLegalDataFromAdmin(contractId) {
+  const customerType = document.getElementById('contract-legal-customer-type')?.value?.trim() || '';
+  const clientLegalName = document.getElementById('contract-legal-client-legal-name')?.value?.trim() || '';
+  const clientTaxId = document.getElementById('contract-legal-client-tax-id')?.value?.trim() || '';
+  const billingEmail = document.getElementById('contract-legal-billing-email')?.value?.trim() || '';
+  const signerName = document.getElementById('contract-legal-signer-name')?.value?.trim() || '';
+  const signerRole = document.getElementById('contract-legal-signer-role')?.value?.trim() || '';
+  const signerTaxId = document.getElementById('contract-legal-signer-tax-id')?.value?.trim() || '';
+  const status = document.getElementById('contract-legal-data-status');
+  const saveButton = document.getElementById('save-contract-legal-data-btn');
+
+  const missingFields = [];
+
+  if (!customerType) missingFields.push('type client');
+  if (!clientLegalName) missingFields.push('client / raison sociale');
+  if (!clientTaxId) missingFields.push('NIF / NIE / CIF client');
+  if (!billingEmail) missingFields.push('email de facturation');
+  if (!signerName) missingFields.push('nom du signataire');
+  if (!signerRole) missingFields.push('rôle du signataire');
+  if (!signerTaxId) missingFields.push('NIF / NIE du signataire');
+
+  if (missingFields.length) {
+    if (status) {
+      status.innerHTML = `
+        Données légales incomplètes.<br>
+        <span class="text-red-200">${missingFields.map(escapeTapCartaHtml).join(' · ')}</span>
+      `;
+      status.className = 'mt-4 text-sm font-semibold text-red-300';
+    }
+    return;
+  }
+
+  const currentMetadata = currentRestaurantData?.contract?.metadata &&
+    typeof currentRestaurantData.contract.metadata === 'object'
+      ? currentRestaurantData.contract.metadata
+      : {};
+
+  const updatedMetadata = {
+    ...currentMetadata,
+    customer_type: customerType,
+    client_legal_name: clientLegalName,
+    client_tax_id: clientTaxId,
+    company_legal_name: clientLegalName,
+    company_tax_id: customerType === 'company' ? clientTaxId : '',
+    billing_email: billingEmail,
+    signer_name: signerName,
+    signer_role: signerRole,
+    signer_tax_id: signerTaxId,
+    legal_data_checked: true,
+    legal_data_checked_at: new Date().toISOString()
+  };
+
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = 'Enregistrement...';
+    saveButton.classList.add('opacity-60');
+  }
+
+  if (status) {
+    status.textContent = 'Enregistrement des données légales dans Supabase...';
+    status.className = 'mt-4 text-sm font-semibold text-cyan-200';
+  }
+
+  try {
+    const { data: updatedContract, error: updateError } = await tapCartaSupabase
+      .from('contracts')
+      .update({
+        company_name: clientLegalName,
+        signer_name: signerName,
+        signer_role: signerRole,
+        signed_email: billingEmail,
+
+        pdf_url: null,
+        pdf_storage_path: null,
+        pdf_generated_at: null,
+        pdf_sent_at: null,
+        pdf_status: null,
+        pdf_generation_error: null,
+
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', contractId)
+      .select(`
+        id,
+        restaurant_id,
+        join_request_id,
+        contract_number,
+        contract_version,
+        language_displayed,
+        official_language,
+        status,
+        signed_at,
+        signed_email,
+        pdf_url,
+        pdf_storage_path,
+        pdf_generated_at,
+        pdf_sent_at,
+        planned_commercial_activation_date,
+        pack_code,
+        monthly_price,
+        currency,
+        signer_name,
+        company_name,
+        signer_role,
+        signature_language,
+        accepted_contract,
+        accepted_authority,
+        accepted_payment,
+        payment_status,
+        payment_provider,
+        signature_source,
+        activation_mode,
+        metadata,
+        contract_type,
+        pdf_status,
+        pdf_generation_method,
+        pdf_generation_provider,
+        pdf_generation_error,
+        created_at,
+        updated_at
+      `)
+      .single();
+
+    if (updateError) {
+      console.error('Erreur mise à jour données légales contrat:', updateError);
+
+      if (status) {
+        status.textContent = `Erreur mise à jour : ${updateError.message || 'voir console'}`;
+        status.className = 'mt-4 text-sm font-semibold text-red-300';
+      }
+
+      return;
+    }
+
+    currentRestaurantData.contract = normalizeContractData(updatedContract);
+    renderContractBillingBlock(updatedContract);
+
+    document.getElementById('complete-contract-legal-data-modal')?.remove();
+
+    alert('Données légales enregistrées. Tu peux maintenant générer le PDF après contrôle.');
+
+  } catch (error) {
+    console.error('Erreur mise à jour données légales contrat:', error);
+
+    if (status) {
+      status.textContent = 'Erreur mise à jour données légales. Voir console.';
+      status.className = 'mt-4 text-sm font-semibold text-red-300';
+    }
+  } finally {
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = 'Enregistrer les données légales';
+      saveButton.classList.remove('opacity-60');
     }
   }
 }
