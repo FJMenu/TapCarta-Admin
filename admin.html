@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.7.1';
+  const APP_VERSION = 'V2.3.7.2';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -3742,6 +3742,75 @@ function getCurrentRestaurantPackCodeForFreeContract() {
   ).trim().toLowerCase();
 }
 
+function getTapCartaContractMissingLegalFields(contract) {
+  const normalizedContract = normalizeContractData(contract);
+  const metadata = normalizedContract.metadata && typeof normalizedContract.metadata === 'object'
+    ? normalizedContract.metadata
+    : {};
+
+  const clientLegalName =
+    normalizedContract.company_name ||
+    metadata.client_legal_name ||
+    metadata.company_legal_name ||
+    metadata.restaurant_trade_name ||
+    metadata.restaurant_name ||
+    '';
+
+  const clientTaxId =
+    metadata.client_tax_id ||
+    metadata.company_tax_id ||
+    metadata.tax_number ||
+    metadata.personal_tax_id ||
+    '';
+
+  const billingEmail =
+    metadata.billing_email ||
+    normalizedContract.signed_email ||
+    '';
+
+  const signerName =
+    normalizedContract.signer_name ||
+    metadata.signer_name ||
+    '';
+
+  const signerRole =
+    normalizedContract.signer_role ||
+    metadata.signer_role ||
+    '';
+
+  const signerTaxId =
+    metadata.signer_tax_id ||
+    '';
+
+  const missingFields = [];
+
+  if (!String(clientLegalName).trim()) {
+    missingFields.push('Client / raison sociale');
+  }
+
+  if (!String(clientTaxId).trim()) {
+    missingFields.push('NIF / NIE / CIF client');
+  }
+
+  if (!String(billingEmail).trim()) {
+    missingFields.push('Email de facturation');
+  }
+
+  if (!String(signerName).trim()) {
+    missingFields.push('Nom du signataire');
+  }
+
+  if (!String(signerRole).trim()) {
+    missingFields.push('Rôle du signataire');
+  }
+
+  if (!String(signerTaxId).trim()) {
+    missingFields.push('NIF / NIE du signataire');
+  }
+
+  return missingFields;
+}
+
 function openPrepareFreeContractModal() {
   if (!currentRestaurantData || !currentRestaurantId) {
     alert('Sélectionne d’abord un établissement.');
@@ -3853,6 +3922,91 @@ function openPrepareFreeContractModal() {
             class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
           >
         </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            Type client
+          </label>
+          <select
+            id="free-contract-customer-type"
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+            <option value="company">Société / personne morale</option>
+            <option value="self_employed">Autónomo / personne physique</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            Email de facturation
+          </label>
+          <input
+            id="free-contract-billing-email"
+            type="email"
+            placeholder="email officiel du client"
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            Client / raison sociale
+          </label>
+          <input
+            id="free-contract-client-legal-name"
+            type="text"
+            placeholder="Nom légal ou société"
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            NIF / NIE / CIF client
+          </label>
+          <input
+            id="free-contract-client-tax-id"
+            type="text"
+            placeholder="CIF société ou NIF/NIE autónomo"
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            Nom du signataire
+          </label>
+          <input
+            id="free-contract-signer-name"
+            type="text"
+            placeholder="Nom complet de la personne qui signe"
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div>
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            Rôle du signataire
+          </label>
+          <input
+            id="free-contract-signer-role"
+            type="text"
+            placeholder="Gérante, administradora, propriétaire..."
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="mb-2 block text-xs uppercase tracking-wide text-cream/45">
+            NIF / NIE du signataire
+          </label>
+          <input
+            id="free-contract-signer-tax-id"
+            type="text"
+            placeholder="NIF/NIE de la personne autorisée à signer"
+            class="w-full rounded-xl border border-emerald-400/25 bg-black/25 px-4 py-3 text-sm text-cream outline-none"
+          >
+        </div>
       </div>
 
       <div class="mt-5 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm leading-relaxed text-emerald-100/85">
@@ -3908,12 +4062,36 @@ async function createFreeContractFromAdmin() {
   const freeReason = document.getElementById('free-contract-reason')?.value?.trim() || '';
   const freeStartDate = document.getElementById('free-contract-start-date')?.value || '';
   const freeEndDate = document.getElementById('free-contract-end-date')?.value || '';
+  const customerType = document.getElementById('free-contract-customer-type')?.value?.trim() || '';
+  const clientLegalName = document.getElementById('free-contract-client-legal-name')?.value?.trim() || '';
+  const clientTaxId = document.getElementById('free-contract-client-tax-id')?.value?.trim() || '';
+  const billingEmail = document.getElementById('free-contract-billing-email')?.value?.trim() || '';
+  const signerName = document.getElementById('free-contract-signer-name')?.value?.trim() || '';
+  const signerRole = document.getElementById('free-contract-signer-role')?.value?.trim() || '';
+  const signerTaxId = document.getElementById('free-contract-signer-tax-id')?.value?.trim() || '';
   const status = document.getElementById('free-contract-modal-status');
   const confirmButton = document.getElementById('confirm-free-contract-btn');
 
-  if (!packCode || !freeReason || !freeStartDate || !freeEndDate) {
+  const missingRequiredFields = [];
+
+  if (!packCode) missingRequiredFields.push('pack offert');
+  if (!freeReason) missingRequiredFields.push('raison de gratuité');
+  if (!freeStartDate) missingRequiredFields.push('date de début');
+  if (!freeEndDate) missingRequiredFields.push('date de fin');
+  if (!customerType) missingRequiredFields.push('type client');
+  if (!clientLegalName) missingRequiredFields.push('client / raison sociale');
+  if (!clientTaxId) missingRequiredFields.push('NIF / NIE / CIF client');
+  if (!billingEmail) missingRequiredFields.push('email de facturation');
+  if (!signerName) missingRequiredFields.push('nom du signataire');
+  if (!signerRole) missingRequiredFields.push('rôle du signataire');
+  if (!signerTaxId) missingRequiredFields.push('NIF / NIE du signataire');
+
+  if (missingRequiredFields.length) {
     if (status) {
-      status.textContent = 'Complète le pack, la raison, la date de début et la date de fin.';
+      status.innerHTML = `
+        Contrat impossible à créer : données obligatoires manquantes.<br>
+        <span class="text-red-200">${missingRequiredFields.map(escapeTapCartaHtml).join(' · ')}</span>
+      `;
       status.className = 'mt-4 text-sm font-semibold text-red-300';
     }
     return;
@@ -3946,14 +4124,24 @@ async function createFreeContractFromAdmin() {
     free_start_date: freeStartDate,
     free_end_date: freeEndDate,
     free_no_auto_conversion: true,
+    customer_type: customerType,
+    client_legal_name: clientLegalName,
+    client_tax_id: clientTaxId,
+    billing_email: billingEmail,
+    signer_name: signerName,
+    signer_role: signerRole,
+    signer_tax_id: signerTaxId,
     restaurant_name: restaurantName,
     restaurant_trade_name: restaurantName,
     restaurant_slug: restaurantSlug,
-    official_contract_language: 'es'
+    official_contract_language: 'es',
+    legal_data_checked: true,
+    legal_data_checked_at: new Date().toISOString()
   };
 
   const contractPayload = {
     restaurant_id: currentRestaurantId,
+    join_request_id: currentRestaurantData?.workflow?.join_request_id || null,
     contract_type: 'free',
     status: 'draft',
     pack_code: packCode,
@@ -3965,8 +4153,28 @@ async function createFreeContractFromAdmin() {
     official_language: 'es',
     language_displayed: 'es',
     signature_language: 'es',
+    company_name: clientLegalName,
+    signer_name: signerName,
+    signer_role: signerRole,
+    signed_email: billingEmail,
     metadata
   };
+
+  const missingLegalFields = getTapCartaContractMissingLegalFields({
+    ...contractPayload,
+    metadata
+  });
+
+  if (missingLegalFields.length) {
+    if (status) {
+      status.innerHTML = `
+        Contrat impossible à créer : données légales incomplètes.<br>
+        <span class="text-red-200">${missingLegalFields.map(escapeTapCartaHtml).join(' · ')}</span>
+      `;
+      status.className = 'mt-4 text-sm font-semibold text-red-300';
+    }
+    return;
+  }
 
   if (confirmButton) {
     confirmButton.disabled = true;
@@ -4047,13 +4255,13 @@ async function createFreeContractFromAdmin() {
 
     const actionStatus = document.getElementById('free-contract-action-status');
     if (actionStatus) {
-      actionStatus.textContent = 'Contrat gratuit créé dans Supabase.';
+      actionStatus.textContent = 'Contrat gratuit créé dans Supabase. Génération PDF possible après contrôle.';
       actionStatus.className = 'mt-3 text-xs font-semibold text-emerald-300';
     }
 
     document.getElementById('prepare-free-contract-modal')?.remove();
 
-    alert('Contrat gratuit créé. Tu peux maintenant générer le PDF contrat.');
+    alert('Contrat gratuit créé avec données légales complètes. Tu peux maintenant générer le PDF contrat.');
 
   } catch (error) {
     console.error('Erreur création contrat gratuit:', error);
@@ -4077,9 +4285,79 @@ async function generateContractPdfFromAdmin(contractId) {
     return;
   }
 
+  let contractBeforeGeneration = null;
+
+  try {
+    const { data, error } = await tapCartaSupabase
+      .from('contracts')
+      .select(`
+        id,
+        restaurant_id,
+        join_request_id,
+        contract_number,
+        contract_version,
+        language_displayed,
+        official_language,
+        status,
+        signed_at,
+        signed_email,
+        pdf_url,
+        pdf_storage_path,
+        pdf_generated_at,
+        pdf_sent_at,
+        planned_commercial_activation_date,
+        pack_code,
+        monthly_price,
+        currency,
+        signer_name,
+        company_name,
+        signer_role,
+        signature_language,
+        accepted_contract,
+        accepted_authority,
+        accepted_payment,
+        payment_status,
+        payment_provider,
+        signature_source,
+        activation_mode,
+        metadata,
+        contract_type,
+        pdf_status,
+        pdf_generation_method,
+        pdf_generation_provider,
+        pdf_generation_error,
+        created_at,
+        updated_at
+      `)
+      .eq('id', contractId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Erreur contrôle contrat avant PDF:', error);
+      alert('Impossible de contrôler le contrat avant génération PDF.');
+      return;
+    }
+
+    contractBeforeGeneration = data;
+  } catch (error) {
+    console.error('Erreur contrôle contrat avant PDF:', error);
+    alert('Erreur contrôle contrat avant PDF. Voir console.');
+    return;
+  }
+
+  const missingLegalFields = getTapCartaContractMissingLegalFields(contractBeforeGeneration);
+
+  if (missingLegalFields.length) {
+    alert(
+      'Contrat impossible à générer : données légales incomplètes.\n\n' +
+      missingLegalFields.join('\n')
+    );
+    return;
+  }
+
   const confirmed = await showTapCartaConfirmModal({
     title: 'Générer le PDF contrat ?',
-    message: 'Cette action appelle Supabase, génère le PDF via DocuGenerate, l’upload dans contract-pdfs et met à jour la ligne contracts.',
+    message: 'Cette action génère le PDF officiel, l’upload dans Supabase Storage et met à jour la ligne contracts.',
     confirmLabel: 'Générer le PDF',
     cancelLabel: 'Annuler'
   });
@@ -4106,35 +4384,26 @@ async function generateContractPdfFromAdmin(contractId) {
     const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-contract-pdf`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`,
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        contractId: contractId
+        contract_id: contractId
       })
     });
 
-    const responseText = await response.text();
+    const result = await response.json().catch(() => ({}));
 
-    let result = null;
-
-    try {
-      result = responseText ? JSON.parse(responseText) : null;
-    } catch (_error) {
-      result = null;
-    }
-
-    if (!response.ok || !result?.success) {
-      console.error('Erreur génération PDF contrat:', response.status, responseText);
-      alert(
-        result?.error
-          ? `Erreur génération PDF : ${result.error}`
-          : `Erreur génération PDF. HTTP ${response.status}`
-      );
+    if (!response.ok) {
+      console.error('Erreur Edge Function PDF:', result);
+      alert(result?.error || 'Erreur génération PDF contrat.');
       return;
     }
 
-    const { data: freshContract, error: freshContractError } = await tapCartaSupabase
+    let freshContract = null;
+
+    const { data: freshContractData, error: freshContractError } = await tapCartaSupabase
       .from('contracts')
       .select(`
         id,
@@ -4179,9 +4448,9 @@ async function generateContractPdfFromAdmin(contractId) {
       .maybeSingle();
 
     if (freshContractError) {
-      console.error('PDF généré, mais erreur relecture contrat:', freshContractError);
-      alert('PDF généré, mais la relecture Admin a échoué. Recharge la fiche.');
-      return;
+      console.warn('Contrat généré mais relecture impossible:', freshContractError);
+    } else {
+      freshContract = freshContractData;
     }
 
     if (currentRestaurantData) {
