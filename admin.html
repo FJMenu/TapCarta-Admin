@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.7.2';
+  const APP_VERSION = 'V2.3.7.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -4062,6 +4062,7 @@ async function createFreeContractFromAdmin() {
   const freeReason = document.getElementById('free-contract-reason')?.value?.trim() || '';
   const freeStartDate = document.getElementById('free-contract-start-date')?.value || '';
   const freeEndDate = document.getElementById('free-contract-end-date')?.value || '';
+
   const customerType = document.getElementById('free-contract-customer-type')?.value?.trim() || '';
   const clientLegalName = document.getElementById('free-contract-client-legal-name')?.value?.trim() || '';
   const clientTaxId = document.getElementById('free-contract-client-tax-id')?.value?.trim() || '';
@@ -4069,6 +4070,7 @@ async function createFreeContractFromAdmin() {
   const signerName = document.getElementById('free-contract-signer-name')?.value?.trim() || '';
   const signerRole = document.getElementById('free-contract-signer-role')?.value?.trim() || '';
   const signerTaxId = document.getElementById('free-contract-signer-tax-id')?.value?.trim() || '';
+
   const status = document.getElementById('free-contract-modal-status');
   const confirmButton = document.getElementById('confirm-free-contract-btn');
 
@@ -4078,13 +4080,6 @@ async function createFreeContractFromAdmin() {
   if (!freeReason) missingRequiredFields.push('raison de gratuité');
   if (!freeStartDate) missingRequiredFields.push('date de début');
   if (!freeEndDate) missingRequiredFields.push('date de fin');
-  if (!customerType) missingRequiredFields.push('type client');
-  if (!clientLegalName) missingRequiredFields.push('client / raison sociale');
-  if (!clientTaxId) missingRequiredFields.push('NIF / NIE / CIF client');
-  if (!billingEmail) missingRequiredFields.push('email de facturation');
-  if (!signerName) missingRequiredFields.push('nom du signataire');
-  if (!signerRole) missingRequiredFields.push('rôle du signataire');
-  if (!signerTaxId) missingRequiredFields.push('NIF / NIE du signataire');
 
   if (missingRequiredFields.length) {
     if (status) {
@@ -4119,24 +4114,39 @@ async function createFreeContractFromAdmin() {
     currentRestaurantData?.billing?.plannedCommercialActivationDate ||
     freeStartDate;
 
+  const legalDataChecked = Boolean(
+    customerType &&
+    clientLegalName &&
+    clientTaxId &&
+    billingEmail &&
+    signerName &&
+    signerRole &&
+    signerTaxId
+  );
+
   const metadata = {
     free_reason: freeReason,
     free_start_date: freeStartDate,
     free_end_date: freeEndDate,
     free_no_auto_conversion: true,
+
     customer_type: customerType,
     client_legal_name: clientLegalName,
     client_tax_id: clientTaxId,
+    company_legal_name: clientLegalName,
+    company_tax_id: customerType === 'company' ? clientTaxId : '',
     billing_email: billingEmail,
     signer_name: signerName,
     signer_role: signerRole,
     signer_tax_id: signerTaxId,
+
     restaurant_name: restaurantName,
     restaurant_trade_name: restaurantName,
     restaurant_slug: restaurantSlug,
     official_contract_language: 'es',
-    legal_data_checked: true,
-    legal_data_checked_at: new Date().toISOString()
+
+    legal_data_checked: legalDataChecked,
+    legal_data_checked_at: legalDataChecked ? new Date().toISOString() : null
   };
 
   const contractPayload = {
@@ -4153,28 +4163,12 @@ async function createFreeContractFromAdmin() {
     official_language: 'es',
     language_displayed: 'es',
     signature_language: 'es',
-    company_name: clientLegalName,
-    signer_name: signerName,
-    signer_role: signerRole,
-    signed_email: billingEmail,
+    company_name: clientLegalName || null,
+    signer_name: signerName || null,
+    signer_role: signerRole || null,
+    signed_email: billingEmail || null,
     metadata
   };
-
-  const missingLegalFields = getTapCartaContractMissingLegalFields({
-    ...contractPayload,
-    metadata
-  });
-
-  if (missingLegalFields.length) {
-    if (status) {
-      status.innerHTML = `
-        Contrat impossible à créer : données légales incomplètes.<br>
-        <span class="text-red-200">${missingLegalFields.map(escapeTapCartaHtml).join(' · ')}</span>
-      `;
-      status.className = 'mt-4 text-sm font-semibold text-red-300';
-    }
-    return;
-  }
 
   if (confirmButton) {
     confirmButton.disabled = true;
@@ -4255,13 +4249,19 @@ async function createFreeContractFromAdmin() {
 
     const actionStatus = document.getElementById('free-contract-action-status');
     if (actionStatus) {
-      actionStatus.textContent = 'Contrat gratuit créé dans Supabase. Génération PDF possible après contrôle.';
+      actionStatus.textContent = legalDataChecked
+        ? 'Contrat gratuit créé avec données légales.'
+        : 'Contrat gratuit créé en brouillon. Données légales à compléter avant génération PDF.';
       actionStatus.className = 'mt-3 text-xs font-semibold text-emerald-300';
     }
 
     document.getElementById('prepare-free-contract-modal')?.remove();
 
-    alert('Contrat gratuit créé avec données légales complètes. Tu peux maintenant générer le PDF contrat.');
+    alert(
+      legalDataChecked
+        ? 'Contrat gratuit créé. Tu peux générer le PDF après contrôle.'
+        : 'Contrat gratuit créé en brouillon. Tu pourras compléter les données légales plus tard avant génération PDF.'
+    );
 
   } catch (error) {
     console.error('Erreur création contrat gratuit:', error);
