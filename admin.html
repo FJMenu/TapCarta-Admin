@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.6.5';
+  const APP_VERSION = 'V2.3.6.6';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -802,6 +802,32 @@
                   <div class="rounded-xl border border-white/8 bg-black/20 px-3 py-3 text-sm text-cream/55">
                     Aucun contrat chargé pour cet établissement.
                   </div>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
+                <div class="mb-3">
+                  <div class="text-xs uppercase tracking-wide text-emerald-300/80 font-bold">
+                    Contrat gratuit
+                  </div>
+                  <div class="mt-1 text-xs leading-relaxed text-cream/55">
+                    Prépare un contrat gratuit officiel avec prix à 0 €, paiement non requis, période de gratuité et aucune conversion automatique.
+                  </div>
+                </div>
+
+                <button
+                  id="prepare-free-contract-btn"
+                  type="button"
+                  class="w-full rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/15"
+                >
+                  Préparer un contrat gratuit
+                </button>
+
+                <div
+                  id="free-contract-action-status"
+                  class="mt-3 text-xs text-cream/45"
+                >
+                  Sélectionne un établissement puis prépare la période de gratuité.
                 </div>
               </div>
             </div>
