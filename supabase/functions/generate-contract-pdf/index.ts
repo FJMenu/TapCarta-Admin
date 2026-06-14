@@ -521,6 +521,15 @@ Deno.serve(async (req) => {
           last_docugenerate_filename: docuJson.filename || null,
           last_docugenerate_format: docuJson.format || null,
           last_pdf_generated_automatically: true,
+          last_pdf_debug_is_free_contract: freeContract,
+          last_pdf_debug_selected_template_type: freeContract ? "free" : "paid",
+          last_pdf_debug_contract_type: typedContract.contract_type || null,
+          last_pdf_debug_payment_status: typedContract.payment_status || null,
+          last_pdf_debug_monthly_price: typedContract.monthly_price || null,
+          last_pdf_debug_free_start_date: safeString(typedContract.metadata?.free_start_date) || null,
+          last_pdf_debug_free_end_date: safeString(typedContract.metadata?.free_end_date) || null,
+          last_pdf_debug_initial_term_months_sent: contractData.initial_term_months,
+          last_pdf_debug_free_period_label_sent: contractData.free_period_label || null,
         },
       })
       .eq("id", typedContract.id)
