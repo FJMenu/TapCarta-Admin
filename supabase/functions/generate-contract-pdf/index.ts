@@ -67,20 +67,31 @@ function formatDateES(value: string | null | undefined, fallback = "Pendiente") 
 
   const rawValue = String(value).trim();
 
-  // Important : évite les décalages de date liés aux fuseaux horaires
-  // quand Supabase renvoie une date au format YYYY-MM-DD ou ISO.
-  const isoDateMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoDateMatch) {
-    const [, year, month, day] = isoDateMatch;
+  // Cas sûr : date pure Supabase au format YYYY-MM-DD.
+  // On ne passe pas par new Date() pour éviter tout décalage UTC.
+  const dateOnlyMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
     return `${day}/${month}/${year}`;
   }
 
   const date = new Date(rawValue);
   if (Number.isNaN(date.getTime())) return rawValue;
 
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = String(date.getFullYear());
+  // Cas ISO avec heure / UTC : on force l’affichage en Espagne.
+  // Exemple : 2026-06-14T22:00:00.000Z devient bien 15/06/2026.
+  const parts = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(date);
+
+  const day = parts.find((part) => part.type === "day")?.value || "";
+  const month = parts.find((part) => part.type === "month")?.value || "";
+  const year = parts.find((part) => part.type === "year")?.value || "";
+
+  if (!day || !month || !year) return rawValue;
 
   return `${day}/${month}/${year}`;
 }
