@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.7.4';
+  const APP_VERSION = 'V2.3.7.5';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -4709,7 +4709,23 @@ async function generateContractPdfFromAdmin(contractId) {
       return;
     }
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/generate-contract-pdf`, {
+    const normalizedContractType = String(contractBeforeGeneration?.contract_type || '').trim().toLowerCase();
+    const normalizedPaymentStatus = String(contractBeforeGeneration?.payment_status || '').trim().toLowerCase();
+    const normalizedMonthlyPrice = Number(contractBeforeGeneration?.monthly_price ?? 0);
+
+    const isFreeContract =
+      normalizedContractType === 'free' ||
+      (
+        normalizedPaymentStatus === 'not_required' &&
+        Number.isFinite(normalizedMonthlyPrice) &&
+        normalizedMonthlyPrice === 0
+      );
+
+    const pdfFunctionName = isFreeContract
+      ? 'generate-free-contract-pdf'
+      : 'generate-contract-pdf';
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/${pdfFunctionName}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -4717,6 +4733,7 @@ async function generateContractPdfFromAdmin(contractId) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        contractId: contractId,
         contract_id: contractId
       })
     });
