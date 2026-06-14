@@ -536,6 +536,18 @@ Deno.serve(async (req) => {
       message: "PDF contrat généré automatiquement",
       contract: updatedContract,
       storagePath,
+      debug_contract_pdf: {
+        is_free_contract: freeContract,
+        selected_template_type: freeContract ? "free" : "paid",
+        contract_type: typedContract.contract_type || null,
+        payment_status: typedContract.payment_status || null,
+        monthly_price: typedContract.monthly_price || null,
+        metadata_free_start_date: safeString(typedContract.metadata?.free_start_date) || null,
+        metadata_free_end_date: safeString(typedContract.metadata?.free_end_date) || null,
+        metadata_free_reason: safeString(typedContract.metadata?.free_reason) || null,
+        sent_initial_term_months: contractData.initial_term_months,
+        sent_free_period_label: contractData.free_period_label || null,
+      },
       docugenerate: {
         id: docuJson.id || null,
         filename: docuJson.filename || null,
