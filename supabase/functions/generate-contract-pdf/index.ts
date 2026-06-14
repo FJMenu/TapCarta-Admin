@@ -1,4 +1,12 @@
+// @ts-expect-error github.dev ne résout pas les imports URL Deno/Supabase Edge Function.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+declare const Deno: {
+  serve: (handler: (req: Request) => Response | Promise<Response>) => void;
+  env: {
+    get: (key: string) => string | undefined;
+  };
+};
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -57,8 +65,18 @@ function safeString(value: unknown, fallback = "") {
 function formatDateES(value: string | null | undefined, fallback = "Pendiente") {
   if (!value) return fallback;
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  const rawValue = String(value).trim();
+
+  // Important : évite les décalages de date liés aux fuseaux horaires
+  // quand Supabase renvoie une date au format YYYY-MM-DD ou ISO.
+  const isoDateMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDateMatch) {
+    const [, year, month, day] = isoDateMatch;
+    return `${day}/${month}/${year}`;
+  }
+
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) return rawValue;
 
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -93,7 +111,33 @@ function buildStoragePath(outputName: string) {
   return `${outputName}.pdf`;
 }
 
+function getContractType(contract: ContractRow) {
+  return safeString(contract.contract_type).toLowerCase();
+}
+
+function isFreeContract(contract: ContractRow) {
+  const metadata = contract.metadata || {};
+  const contractType = getContractType(contract);
+
+  if (contractType === "free") return true;
+
+  const freeNoAutoConversion =
+    metadata.free_no_auto_conversion === true ||
+    safeString(metadata.free_no_auto_conversion).toLowerCase() === "true";
+
+  const priceSource = contract.commercial_snapshot?.monthly_price_htva ?? contract.monthly_price ?? 0;
+  const numericPrice = Number(priceSource);
+  const paymentStatus = safeString(contract.payment_status).toLowerCase();
+
+  return freeNoAutoConversion || (
+    paymentStatus === "not_required" &&
+    Number.isFinite(numericPrice) &&
+    numericPrice === 0
+  );
+}
+
 function getInitialTermMonths(contract: ContractRow) {
+  if (isFreeContract(contract)) return "No aplica";
   return safeString(contract.terms_snapshot?.initial_term_months, "12");
 }
 
@@ -122,6 +166,35 @@ function getMonthlyPrice(contract: ContractRow) {
 function buildContractData(contract: ContractRow) {
   const metadata = contract.metadata || {};
   const today = formatDateES(new Date().toISOString());
+  const freeContract = isFreeContract(contract);
+
+  const freeStartDateRaw =
+    safeString(metadata.free_start_date) ||
+    safeString(contract.commercial_snapshot?.free_start_date) ||
+    safeString(contract.terms_snapshot?.free_start_date);
+
+  const freeEndDateRaw =
+    safeString(metadata.free_end_date) ||
+    safeString(contract.commercial_snapshot?.free_end_date) ||
+    safeString(contract.terms_snapshot?.free_end_date);
+
+  const freeStartDate = formatDateES(freeStartDateRaw, "Pendiente");
+  const freeEndDate = formatDateES(freeEndDateRaw, "Pendiente");
+
+  const freeReasonCode = safeString(metadata.free_reason).toLowerCase();
+
+  const freeReasonLabels: Record<string, string> = {
+    discovery_offer: "Oferta de descubrimiento",
+    commercial_launch: "Oferta de lanzamiento comercial",
+    partner_offer: "Oferta de socio",
+    courtesy_offer: "Cortesía comercial",
+    exceptional_offer: "Oferta excepcional",
+  };
+
+  const freeReasonLabel =
+    safeString(metadata.free_reason_label) ||
+    freeReasonLabels[freeReasonCode] ||
+    "Oferta de descubrimiento";
 
   return {
     contract_reference: safeString(contract.contract_number),
@@ -159,7 +232,7 @@ function buildContractData(contract: ContractRow) {
 
     selected_offer: getSelectedOfferLabel(contract),
 
-    monthly_price_htva: getMonthlyPrice(contract),
+    monthly_price_htva: freeContract ? "0" : getMonthlyPrice(contract),
 
     commercial_activation_date: formatDateES(
       contract.planned_commercial_activation_date ||
@@ -169,7 +242,30 @@ function buildContractData(contract: ContractRow) {
 
     initial_term_months: getInitialTermMonths(contract),
 
-    payment_method: getPaymentMethod(contract),
+    payment_method: freeContract
+      ? "No requerido durante el período gratuito"
+      : getPaymentMethod(contract),
+
+    contract_type_label: freeContract
+      ? `Contrato gratuito - ${freeReasonLabel}`
+      : "Contrato de servicio TapCarta",
+
+    payment_legal_notice: freeContract
+      ? "No se requiere ningún pago mensual durante el período gratuito indicado en este contrato."
+      : "El pago se realizará conforme a las condiciones económicas y al medio de pago acordado entre las partes.",
+
+    free_start_date: freeContract ? freeStartDate : "",
+    free_end_date: freeContract ? freeEndDate : "",
+
+    free_period_label: freeContract
+      ? `Del ${freeStartDate} al ${freeEndDate}`
+      : "",
+
+    free_reason_label: freeContract ? freeReasonLabel : "",
+
+    free_no_auto_conversion_clause: freeContract
+      ? "La finalización del período gratuito no supondrá la conversión automática a un servicio de pago. La continuidad del servicio de pago requerirá un acuerdo expreso entre las partes."
+      : "",
 
     signature_date: contract.signed_at
       ? formatDateES(contract.signed_at)
@@ -213,7 +309,8 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const docuGenerateApiKey = Deno.env.get("DOCUGENERATE_API_KEY");
-  const docuGenerateTemplateEsId = Deno.env.get("DOCUGENERATE_TEMPLATE_ES_ID");
+  const docuGeneratePaidTemplateEsId = Deno.env.get("DOCUGENERATE_TEMPLATE_ES_ID");
+  const docuGenerateFreeTemplateEsId = Deno.env.get("DOCUGENERATE_TEMPLATE_ES_FREE_ID");
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse({
@@ -222,7 +319,7 @@ Deno.serve(async (req) => {
     }, 500);
   }
 
-  if (!docuGenerateApiKey || !docuGenerateTemplateEsId) {
+  if (!docuGenerateApiKey || !docuGeneratePaidTemplateEsId) {
     return jsonResponse({
       success: false,
       error: "Secrets DocuGenerate manquants : DOCUGENERATE_API_KEY ou DOCUGENERATE_TEMPLATE_ES_ID",
@@ -291,6 +388,20 @@ Deno.serve(async (req) => {
     }
 
     const typedContract = contract as ContractRow;
+    const freeContract = isFreeContract(typedContract);
+
+    const selectedDocuGenerateTemplateEsId = freeContract
+      ? docuGenerateFreeTemplateEsId
+      : docuGeneratePaidTemplateEsId;
+
+    if (!selectedDocuGenerateTemplateEsId) {
+      return jsonResponse({
+        success: false,
+        error: freeContract
+          ? "Secret DocuGenerate manquant : DOCUGENERATE_TEMPLATE_ES_FREE_ID"
+          : "Secret DocuGenerate manquant : DOCUGENERATE_TEMPLATE_ES_ID",
+      }, 500);
+    }
 
     await supabaseAdmin
       .from("contracts")
@@ -316,7 +427,7 @@ Deno.serve(async (req) => {
     const storagePath = buildStoragePath(outputName);
 
     const formData = new FormData();
-    formData.append("template_id", docuGenerateTemplateEsId);
+    formData.append("template_id", selectedDocuGenerateTemplateEsId);
     formData.append("data", JSON.stringify(docuGenerateData));
     formData.append("output_format", ".pdf");
     formData.append("output_name", outputName);
