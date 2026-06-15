@@ -4184,6 +4184,7 @@ async function createFreeContractFromAdmin() {
     restaurant_id: currentRestaurantId,
     join_request_id: currentRestaurantData?.workflow?.join_request_id || null,
     contract_number: generatedFreeContractNumber,
+        contract_version: 'ES_FREE_2026_06_V1',
     contract_type: 'free',
     status: 'draft',
     pack_code: packCode,
