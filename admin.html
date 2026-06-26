@@ -125,25 +125,163 @@
     </button>
   </nav>
 
-  <div class="mt-auto border-t border-white/10 pt-5">
-    <button
-      id="nav-resto-updates-btn"
-      type="button"
-      class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
+<div class="mt-auto border-t border-white/10 pt-5">
+  <button
+    id="nav-resto-updates-btn"
+    type="button"
+    aria-live="polite"
+    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
+  >
+    <span
+      id="nav-resto-updates-icon"
+      class="flex h-5 w-5 shrink-0 items-center justify-center text-cream/70"
+      aria-hidden="true"
     >
-      <i data-lucide="refresh-cw" class="h-5 w-5 shrink-0 text-cream/70"></i>
+      <i data-lucide="refresh-cw" class="h-5 w-5"></i>
+    </span>
 
-      <span class="min-w-0">
-        <span class="block text-sm font-semibold text-cream">
-          Mises à jour Resto
-        </span>
-        <span class="mt-0.5 block text-xs text-cream/55">
-          Vérification des mises à jour
-        </span>
+    <span class="min-w-0">
+      <span
+        id="nav-resto-updates-title"
+        class="block text-sm font-semibold text-cream"
+      >
+        Mises à jour Resto
       </span>
-    </button>
-  </div>
-</aside>
+
+      <span
+        id="nav-resto-updates-subtitle"
+        class="mt-0.5 block text-xs text-cream/55"
+      >
+        Vérification des mises à jour
+      </span>
+    </span>
+  </button>
+</div>
+
+<script>
+  window.tapCartaRestoUpdateVisualState = {
+    status: 'neutral',
+    version: '',
+    stabilizationEndsAt: null
+  };
+
+  let tapCartaRestoUpdateCountdownTimer = null;
+
+  function formatTapCartaRestoUpdateRemainingTime(remainingMs) {
+    const totalMinutes = Math.max(0, Math.ceil(remainingMs / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours > 0) {
+      return `${hours} h ${String(minutes).padStart(2, '0')} min`;
+    }
+
+    return `${minutes} min`;
+  }
+
+  function renderTapCartaRestoUpdateButton() {
+    const button = document.getElementById('nav-resto-updates-btn');
+    const icon = document.getElementById('nav-resto-updates-icon');
+    const title = document.getElementById('nav-resto-updates-title');
+    const subtitle = document.getElementById('nav-resto-updates-subtitle');
+
+    if (!button || !icon || !title || !subtitle) return;
+
+    const state = window.tapCartaRestoUpdateVisualState || {};
+    const version = state.version ? ` · ${state.version}` : '';
+
+    const visualStates = {
+      neutral: {
+        icon: 'refresh-cw',
+        buttonClass: 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]',
+        iconClass: 'text-cream/70',
+        titleClass: 'text-cream',
+        subtitleClass: 'text-cream/55',
+        title: 'Mises à jour Resto',
+        subtitle: 'Vérification des mises à jour'
+      },
+      stabilizing: {
+        icon: 'clock-3',
+        buttonClass: 'border-amber-400/35 bg-amber-500/10 hover:bg-amber-500/15',
+        iconClass: 'text-amber-300',
+        titleClass: 'text-amber-200',
+        subtitleClass: 'text-amber-200/75',
+        title: 'Mise à jour en stabilisation',
+        subtitle: ''
+      },
+      deployed: {
+        icon: 'circle-check',
+        buttonClass: 'border-emerald-400/35 bg-emerald-500/10 hover:bg-emerald-500/15',
+        iconClass: 'text-emerald-300',
+        titleClass: 'text-emerald-200',
+        subtitleClass: 'text-emerald-200/75',
+        title: 'Mise à jour déployée',
+        subtitle: `Version publiée${version}`
+      },
+      refused: {
+        icon: 'circle-x',
+        buttonClass: 'border-red-400/30 bg-red-500/10 hover:bg-red-500/15',
+        iconClass: 'text-red-300',
+        titleClass: 'text-red-200',
+        subtitleClass: 'text-red-200/75',
+        title: 'Mise à jour refusée',
+        subtitle: `Contrôle requis${version}`
+      }
+    };
+
+    const currentVisual = visualStates[state.status] || visualStates.neutral;
+
+    button.className = `w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${currentVisual.buttonClass}`;
+
+    icon.className = `flex h-5 w-5 shrink-0 items-center justify-center ${currentVisual.iconClass}`;
+    icon.innerHTML = `<i data-lucide="${currentVisual.icon}" class="h-5 w-5"></i>`;
+
+    title.className = `block text-sm font-semibold ${currentVisual.titleClass}`;
+    title.textContent = currentVisual.title;
+
+    subtitle.className = `mt-0.5 block text-xs ${currentVisual.subtitleClass}`;
+
+    if (state.status === 'stabilizing') {
+      const endTime = new Date(state.stabilizationEndsAt).getTime();
+      const remainingMs = endTime - Date.now();
+
+      subtitle.textContent = Number.isFinite(endTime) && remainingMs > 0
+        ? `${state.version || 'Version en cours'} · ${formatTapCartaRestoUpdateRemainingTime(remainingMs)}`
+        : `${state.version || 'Version en cours'} · Stabilisation terminée`;
+    } else {
+      subtitle.textContent = currentVisual.subtitle;
+    }
+
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  }
+
+  function setTapCartaRestoUpdateVisualState(nextState = {}) {
+    window.tapCartaRestoUpdateVisualState = {
+      ...window.tapCartaRestoUpdateVisualState,
+      ...nextState
+    };
+
+    clearInterval(tapCartaRestoUpdateCountdownTimer);
+    renderTapCartaRestoUpdateButton();
+
+    const state = window.tapCartaRestoUpdateVisualState;
+    const endTime = new Date(state.stabilizationEndsAt).getTime();
+
+    if (state.status === 'stabilizing' && Number.isFinite(endTime) && endTime > Date.now()) {
+      tapCartaRestoUpdateCountdownTimer = setInterval(() => {
+        renderTapCartaRestoUpdateButton();
+
+        if (Date.now() >= endTime) {
+          clearInterval(tapCartaRestoUpdateCountdownTimer);
+        }
+      }, 1000);
+    }
+  }
+
+  setTapCartaRestoUpdateVisualState();
+</script>
 
       <main class="p-5 md:p-8">
 <header class="mb-8 flex flex-col gap-4">
