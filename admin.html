@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.8.1';
+  const APP_VERSION = 'V2.3.7.6';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -81,83 +81,49 @@
   <div class="min-h-screen bg-dark text-cream">
     <div class="grid min-h-screen lg:grid-cols-[280px_1fr]">
       
-function setTapCartaRestoReleaseControlState({
-  tone = 'neutral',
-  title = 'Vérification des mises à jour',
-  detail = 'Connexion Admin requise',
-  icon = 'rocket'
-} = {}) {
-  const button = document.getElementById('resto-release-control-btn');
-  const iconSlot = document.getElementById('resto-release-control-icon');
-  const titleElement = document.getElementById('resto-release-control-title');
-  const detailElement = document.getElementById('resto-release-control-detail');
+      <aside class="border-r border-white/10 bg-black/20 p-5">
+        <div class="mb-8">
+          <h1 class="font-display text-2xl text-gold">TapCarta</h1>
+          <p class="text-sm text-cream/60 mt-1">Admin interne</p>
+        </div>
 
-  if (!button || !iconSlot || !titleElement || !detailElement) {
-    return;
-  }
+        <div class="mb-6">
+          <label class="block text-xs uppercase tracking-wide text-cream/50 mb-2">
+            Établissement
+          </label>
+          <select id="restaurant-select" class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none">
+            <option>Chargement...</option>
+          </select>
+        </div>
+<nav class="space-y-2">
+  <button
+    id="nav-establishments-btn"
+    type="button"
+    class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
+  >
+    <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
+    <span>Établissement</span>
+  </button>
 
-  const styles = {
-    neutral: {
-      border: 'rgba(255,255,255,0.10)',
-      background: 'rgba(255,255,255,0.03)',
-      iconColor: 'rgba(250,246,238,0.70)',
-      titleColor: '#FAF6EE',
-      detailColor: 'rgba(250,246,238,0.55)'
-    },
-    stabilizing: {
-      border: 'rgba(251,146,60,0.48)',
-      background: 'rgba(249,115,22,0.11)',
-      iconColor: '#FDBA74',
-      titleColor: '#FED7AA',
-      detailColor: 'rgba(254,215,170,0.82)'
-    },
-    deployed: {
-      border: 'rgba(74,222,128,0.42)',
-      background: 'rgba(34,197,94,0.10)',
-      iconColor: '#86EFAC',
-      titleColor: '#BBF7D0',
-      detailColor: 'rgba(187,247,208,0.82)'
-    },
-    blocked: {
-      border: 'rgba(248,113,113,0.42)',
-      background: 'rgba(239,68,68,0.10)',
-      iconColor: '#FCA5A5',
-      titleColor: '#FECACA',
-      detailColor: 'rgba(254,202,202,0.82)'
-    },
-    error: {
-      border: 'rgba(251,191,36,0.38)',
-      background: 'rgba(245,158,11,0.09)',
-      iconColor: '#FCD34D',
-      titleColor: '#FEF3C7',
-      detailColor: 'rgba(254,243,199,0.78)'
-    }
-  };
+  <button
+    id="nav-modules-btn"
+    type="button"
+    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
+  >
+    <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
+    <span>Modules</span>
+  </button>
 
-  const style = styles[tone] || styles.neutral;
-
-  button.dataset.releaseState = tone;
-  button.title = detail;
-  button.setAttribute('aria-label', `${title}. ${detail}`);
-
-  button.style.borderColor = style.border;
-  button.style.background = style.background;
-
-  iconSlot.style.color = style.iconColor;
-  titleElement.style.color = style.titleColor;
-  detailElement.style.color = style.detailColor;
-
-  titleElement.textContent = title;
-  detailElement.textContent = detail;
-
-  iconSlot.innerHTML = `
-    <i data-lucide="${icon}" class="h-4 w-4"></i>
-  `;
-
-  if (window.lucide) {
-    lucide.createIcons();
-  }
-}
+  <button
+    id="nav-billing-btn"
+    type="button"
+    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
+  >
+    <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
+    <span>Contrat / Facturation</span>
+  </button>
+</nav>
+      </aside>
 
       <main class="p-5 md:p-8">
 <header class="mb-8 flex flex-col gap-4">
@@ -1211,304 +1177,6 @@ async function requestTapCartaNotifications() {
   }
 }
 
-const TAPCARTA_RESTO_RELEASE_STATUS_REFRESH_MS = 60000;
-const TAPCARTA_RESTO_RELEASE_STATUS_TICK_MS = 1000;
-
-let tapCartaRestoReleaseLatest = null;
-let tapCartaRestoReleaseRefreshTimer = null;
-let tapCartaRestoReleaseTickTimer = null;
-let tapCartaRestoReleaseRefreshInFlight = false;
-let tapCartaRestoReleaseListenersBound = false;
-
-function setTapCartaRestoReleaseControlState({
-  tone = 'neutral',
-  title = 'Vérification des mises à jour',
-  detail = 'Connexion Admin requise',
-  icon = 'rocket'
-} = {}) {
-  const button = document.getElementById('resto-release-control-btn');
-  const iconContainer = document.getElementById('resto-release-control-icon');
-  const titleElement = document.getElementById('resto-release-control-title');
-  const detailElement = document.getElementById('resto-release-control-detail');
-
-  if (!button || !iconContainer || !titleElement || !detailElement) {
-    return;
-  }
-
-  const styles = {
-    neutral: {
-      border: 'rgba(255,255,255,0.10)',
-      background: 'rgba(255,255,255,0.03)',
-      iconBorder: 'rgba(255,255,255,0.10)',
-      iconBackground: 'rgba(0,0,0,0.20)',
-      iconColor: 'rgba(250,246,238,0.70)',
-      titleColor: '#FAF6EE',
-      detailColor: 'rgba(250,246,238,0.55)'
-    },
-    stabilizing: {
-      border: 'rgba(251,146,60,0.48)',
-      background: 'rgba(249,115,22,0.11)',
-      iconBorder: 'rgba(251,146,60,0.48)',
-      iconBackground: 'rgba(249,115,22,0.16)',
-      iconColor: '#FDBA74',
-      titleColor: '#FED7AA',
-      detailColor: 'rgba(254,215,170,0.82)'
-    },
-    deployed: {
-      border: 'rgba(74,222,128,0.42)',
-      background: 'rgba(34,197,94,0.10)',
-      iconBorder: 'rgba(74,222,128,0.42)',
-      iconBackground: 'rgba(34,197,94,0.16)',
-      iconColor: '#86EFAC',
-      titleColor: '#BBF7D0',
-      detailColor: 'rgba(187,247,208,0.82)'
-    },
-    blocked: {
-      border: 'rgba(248,113,113,0.42)',
-      background: 'rgba(239,68,68,0.10)',
-      iconBorder: 'rgba(248,113,113,0.42)',
-      iconBackground: 'rgba(239,68,68,0.16)',
-      iconColor: '#FCA5A5',
-      titleColor: '#FECACA',
-      detailColor: 'rgba(254,202,202,0.82)'
-    },
-    error: {
-      border: 'rgba(251,191,36,0.38)',
-      background: 'rgba(245,158,11,0.09)',
-      iconBorder: 'rgba(251,191,36,0.38)',
-      iconBackground: 'rgba(245,158,11,0.14)',
-      iconColor: '#FCD34D',
-      titleColor: '#FEF3C7',
-      detailColor: 'rgba(254,243,199,0.78)'
-    }
-  };
-
-  const style = styles[tone] || styles.neutral;
-
-  button.dataset.releaseState = tone;
-  button.title = detail;
-  button.setAttribute('aria-label', `${title}. ${detail}`);
-
-  button.style.borderColor = style.border;
-  button.style.background = style.background;
-
-  iconContainer.style.borderColor = style.iconBorder;
-  iconContainer.style.background = style.iconBackground;
-  iconContainer.style.color = style.iconColor;
-
-  titleElement.style.color = style.titleColor;
-  detailElement.style.color = style.detailColor;
-
-  titleElement.textContent = title;
-  detailElement.textContent = detail;
-
-  iconContainer.innerHTML = `
-    <i data-lucide="${icon}" class="h-4 w-4"></i>
-  `;
-
-  if (window.lucide) {
-    lucide.createIcons();
-  }
-}
-
-function getTapCartaRestoReleaseEndTime(release) {
-  const publishedAt = Date.parse(String(release?.published_at || ''));
-
-  if (!Number.isFinite(publishedAt)) {
-    return NaN;
-  }
-
-  const stabilizationMinutes = Math.max(
-    0,
-    Number(release?.stabilization_minutes || 120)
-  );
-
-  return publishedAt + (stabilizationMinutes * 60 * 1000);
-}
-
-function formatTapCartaRestoReleaseRemainingTime(remainingMs) {
-  const remainingMinutes = Math.max(
-    0,
-    Math.ceil(remainingMs / 60000)
-  );
-
-  const hours = Math.floor(remainingMinutes / 60);
-  const minutes = remainingMinutes % 60;
-
-  return `${hours} h ${String(minutes).padStart(2, '0')}`;
-}
-
-function renderTapCartaRestoReleaseControl() {
-  const release = tapCartaRestoReleaseLatest;
-
-  if (!release?.version) {
-    setTapCartaRestoReleaseControlState({
-      tone: 'neutral',
-      title: 'Aucune mise à jour publiée',
-      detail: 'Prépare une version Resto pour lancer une stabilisation.',
-      icon: 'rocket'
-    });
-
-    return;
-  }
-
-  const version = String(release.version).trim() || 'Version inconnue';
-
-  if (release.release_status === 'blocked') {
-    setTapCartaRestoReleaseControlState({
-      tone: 'blocked',
-      title: 'Mise à jour bloquée',
-      detail: `${version} · aucun déploiement automatique en cours.`,
-      icon: 'ban'
-    });
-
-    return;
-  }
-
-  const releaseEndTime = getTapCartaRestoReleaseEndTime(release);
-
-  if (!Number.isFinite(releaseEndTime)) {
-    setTapCartaRestoReleaseControlState({
-      tone: 'error',
-      title: 'Mise à jour à vérifier',
-      detail: `${version} · date de publication indisponible.`,
-      icon: 'triangle-alert'
-    });
-
-    return;
-  }
-
-  const remainingMs = releaseEndTime - Date.now();
-
-  if (remainingMs > 0) {
-    setTapCartaRestoReleaseControlState({
-      tone: 'stabilizing',
-      title: 'Mise à jour en stabilisation',
-      detail: `${version} · encore ${formatTapCartaRestoReleaseRemainingTime(remainingMs)}.`,
-      icon: 'timer'
-    });
-
-    return;
-  }
-
-  setTapCartaRestoReleaseControlState({
-    tone: 'deployed',
-    title: 'Mise à jour déployée',
-    detail: `${version} · les tablettes l’appliqueront automatiquement dans leur prochaine fenêtre sûre.`,
-    icon: 'circle-check-big'
-  });
-}
-
-async function refreshTapCartaRestoReleaseControl() {
-  if (tapCartaRestoReleaseRefreshInFlight) {
-    return;
-  }
-
-  tapCartaRestoReleaseRefreshInFlight = true;
-
-  try {
-    const { data: sessionData } =
-      await tapCartaSupabase.auth.getSession();
-
-    if (!sessionData.session) {
-      tapCartaRestoReleaseLatest = null;
-
-      setTapCartaRestoReleaseControlState({
-        tone: 'neutral',
-        title: 'Vérification des mises à jour',
-        detail: 'Connexion Admin requise.',
-        icon: 'rocket'
-      });
-
-      return;
-    }
-
-    const { data, error } =
-      await tapCartaSupabase.functions.invoke(
-        'manage-resto-releases',
-        {
-          body: {
-            action: 'list'
-          }
-        }
-      );
-
-    if (error || !data?.ok) {
-      throw new Error(
-        data?.error ||
-        error?.message ||
-        'Lecture des mises à jour impossible.'
-      );
-    }
-
-    const releases = Array.isArray(data.releases)
-      ? data.releases
-      : [];
-
-    tapCartaRestoReleaseLatest = releases[0] || null;
-
-    renderTapCartaRestoReleaseControl();
-  } catch (error) {
-    console.error(
-      'TapCarta Admin: lecture des mises à jour Resto impossible.',
-      error
-    );
-
-    tapCartaRestoReleaseLatest = null;
-
-    setTapCartaRestoReleaseControlState({
-      tone: 'error',
-      title: 'Mises à jour à vérifier',
-      detail: 'Impossible de lire le statut actuel. Recharge ou vérifie la connexion.',
-      icon: 'triangle-alert'
-    });
-  } finally {
-    tapCartaRestoReleaseRefreshInFlight = false;
-  }
-}
-
-function startTapCartaRestoReleaseControlAutoRefresh() {
-  if (!tapCartaRestoReleaseRefreshTimer) {
-    tapCartaRestoReleaseRefreshTimer = window.setInterval(() => {
-      refreshTapCartaRestoReleaseControl();
-    }, TAPCARTA_RESTO_RELEASE_STATUS_REFRESH_MS);
-  }
-
-  if (!tapCartaRestoReleaseTickTimer) {
-    tapCartaRestoReleaseTickTimer = window.setInterval(() => {
-      renderTapCartaRestoReleaseControl();
-    }, TAPCARTA_RESTO_RELEASE_STATUS_TICK_MS);
-  }
-
-  if (tapCartaRestoReleaseListenersBound) {
-    return;
-  }
-
-  tapCartaRestoReleaseListenersBound = true;
-
-  window.addEventListener('focus', () => {
-    refreshTapCartaRestoReleaseControl();
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      refreshTapCartaRestoReleaseControl();
-    }
-  });
-}
-
-function stopTapCartaRestoReleaseControlAutoRefresh() {
-  if (tapCartaRestoReleaseRefreshTimer) {
-    window.clearInterval(tapCartaRestoReleaseRefreshTimer);
-    tapCartaRestoReleaseRefreshTimer = null;
-  }
-
-  if (tapCartaRestoReleaseTickTimer) {
-    window.clearInterval(tapCartaRestoReleaseTickTimer);
-    tapCartaRestoReleaseTickTimer = null;
-  }
-}
-
 async function initializeSaasAdmin() {
   const loginBtn = document.getElementById('admin-login-btn');
   const logoutBtn = document.getElementById('admin-logout-btn');
@@ -1528,10 +1196,7 @@ async function initializeSaasAdmin() {
 
   const manualRestaurantBtn = document.getElementById('open-manual-restaurant-modal-btn');
   if (manualRestaurantBtn) {
-    manualRestaurantBtn.addEventListener(
-      'click',
-      showTapCartaManualRestaurantModal
-    );
+    manualRestaurantBtn.addEventListener('click', showTapCartaManualRestaurantModal);
   }
 
   updateNotificationButtonVisibility();
@@ -1546,19 +1211,7 @@ async function initializeSaasAdmin() {
     await loadContractsIndex();
     await loadContractsIndex();
     await loadContractsIndex();
-
-    await refreshTapCartaRestoReleaseControl();
-    startTapCartaRestoReleaseControlAutoRefresh();
-
-    return;
   }
-
-  setTapCartaRestoReleaseControlState({
-    tone: 'neutral',
-    title: 'Vérification des mises à jour',
-    detail: 'Connexion Admin requise.',
-    icon: 'rocket'
-  });
 }
 
 async function loginAdmin() {
@@ -1570,23 +1223,18 @@ async function loginAdmin() {
 
   if (!email || !password) {
     alert('Email admin et mot de passe obligatoires.');
-    console.error(
-      'Admin login missing fields:',
-      { email, hasPassword: Boolean(password) }
-    );
-
+    console.error('Admin login missing fields:', { email, hasPassword: Boolean(password) });
     return;
   }
 
   const { data, error } = await tapCartaSupabase.auth.signInWithPassword({
-    email,
-    password
+    email: email,
+    password: password
   });
 
   if (error) {
     alert('Connexion impossible : ' + error.message);
     console.error(error);
-
     return;
   }
 
@@ -1594,9 +1242,6 @@ async function loginAdmin() {
   await loadJoinRequests();
   await loadCommercialPacks();
   await loadRestaurantsIndex();
-
-  await refreshTapCartaRestoReleaseControl();
-  startTapCartaRestoReleaseControlAutoRefresh();
 }
 
 async function logoutAdmin() {
@@ -1612,18 +1257,12 @@ async function logoutAdmin() {
   const establishmentsStatus = document.getElementById('establishments-status');
   const restaurantSelect = document.getElementById('restaurant-select');
 
-  if (establishmentsList) {
-    establishmentsList.innerHTML = '';
-  }
-
+  if (establishmentsList) establishmentsList.innerHTML = '';
   if (establishmentsStatus) {
-    establishmentsStatus.textContent =
-      'Connecte-toi pour afficher les établissements.';
+    establishmentsStatus.textContent = 'Connecte-toi pour afficher les établissements.';
   }
-
   if (restaurantSelect) {
-    restaurantSelect.innerHTML =
-      '<option>Connexion requise</option>';
+    restaurantSelect.innerHTML = '<option>Connexion requise</option>';
   }
 
   restaurantsIndex = [];
@@ -1633,16 +1272,6 @@ async function logoutAdmin() {
   updatePendingContractAlert(0);
   stopJoinRequestsAutoRefresh();
   tapCartaKnownConfirmedRequests.clear();
-
-  stopTapCartaRestoReleaseControlAutoRefresh();
-  tapCartaRestoReleaseLatest = null;
-
-  setTapCartaRestoReleaseControlState({
-    tone: 'neutral',
-    title: 'Vérification des mises à jour',
-    detail: 'Connexion Admin requise.',
-    icon: 'rocket'
-  });
 }
 
 function showAdminSession(email) {
