@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.8.2';
+  const APP_VERSION = 'V2.3.8.3';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -8734,6 +8734,258 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     });
   }
-</script>
+  </script>
+
+  <script>
+    (() => {
+      if (window.__tapCartaRestoReleaseStatusLoaded) return;
+      window.__tapCartaRestoReleaseStatusLoaded = true;
+
+      const TAPCARTA_RESTO_APP_KEY = 'tapcarta-resto';
+      const TAPCARTA_RELEASE_REFRESH_MS = 60000;
+
+      let tapCartaRestoCountdownTimer = null;
+      let tapCartaRestoRefreshTimer = null;
+
+      function escapeTapCartaHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function formatTapCartaRemainingTime(remainingMs) {
+        const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+          return `${hours} h ${String(minutes).padStart(2, '0')} min`;
+        }
+
+        if (minutes > 0) {
+          return `${minutes} min ${String(seconds).padStart(2, '0')} s`;
+        }
+
+        return `${seconds} s`;
+      }
+
+      function getTapCartaRestoUpdateView(release) {
+        if (!release) {
+          return {
+            status: 'neutral',
+            icon: 'refresh-cw',
+            title: 'Mises à jour Resto',
+            subtitle: 'Vérification des mises à jour'
+          };
+        }
+
+        const version = release.version || 'Version non précisée';
+        const releaseStatus = String(release.release_status || '').toLowerCase();
+
+        if (releaseStatus === 'blocked' || releaseStatus === 'refused') {
+          return {
+            status: 'refused',
+            icon: 'circle-x',
+            title: 'Mise à jour refusée',
+            subtitle: `${version} · Contrôle requis`
+          };
+        }
+
+        if (releaseStatus === 'published') {
+          const publishedAtMs = new Date(release.published_at).getTime();
+          const stabilizationMs =
+            Number(release.stabilization_minutes || 0) * 60 * 1000;
+
+          const stabilizationEndsAt =
+            publishedAtMs + stabilizationMs;
+
+          const remainingMs = stabilizationEndsAt - Date.now();
+
+          if (
+            Number.isFinite(publishedAtMs) &&
+            stabilizationMs > 0 &&
+            remainingMs > 0
+          ) {
+            return {
+              status: 'stabilizing',
+              icon: 'clock-3',
+              title: 'Mise à jour en stabilisation',
+              subtitle: `${version} · ${formatTapCartaRemainingTime(remainingMs)}`
+            };
+          }
+
+          return {
+            status: 'deployed',
+            icon: 'circle-check',
+            title: 'Mise à jour déployée',
+            subtitle: `${version} · Publiée`
+          };
+        }
+
+        return {
+          status: 'neutral',
+          icon: 'refresh-cw',
+          title: 'Mises à jour Resto',
+          subtitle: 'Vérification des mises à jour'
+        };
+      }
+
+      function renderTapCartaRestoUpdateButton(view) {
+        const button = document.getElementById('nav-resto-updates-btn');
+
+        if (!button) return;
+
+        const visualClasses = {
+          neutral: {
+            button: 'border-white/10 bg-white/[0.03]',
+            icon: 'text-cream/70',
+            title: 'text-cream',
+            subtitle: 'text-cream/55'
+          },
+          stabilizing: {
+            button: 'border-amber-400/35 bg-amber-500/10',
+            icon: 'text-amber-300',
+            title: 'text-amber-200',
+            subtitle: 'text-amber-200/75'
+          },
+          deployed: {
+            button: 'border-emerald-400/35 bg-emerald-500/10',
+            icon: 'text-emerald-300',
+            title: 'text-emerald-200',
+            subtitle: 'text-emerald-200/75'
+          },
+          refused: {
+            button: 'border-red-400/30 bg-red-500/10',
+            icon: 'text-red-300',
+            title: 'text-red-200',
+            subtitle: 'text-red-200/75'
+          }
+        };
+
+        const colors =
+          visualClasses[view.status] || visualClasses.neutral;
+
+        button.className =
+          `w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${colors.button}`;
+
+        const currentIcon = button.querySelector('[data-lucide], svg');
+
+        if (currentIcon) {
+          currentIcon.outerHTML = `
+            <i
+              data-lucide="${escapeTapCartaHtml(view.icon)}"
+              class="h-4 w-4 shrink-0 ${colors.icon}"
+            ></i>
+          `;
+        }
+
+        const textContainer =
+          button.querySelector('.min-w-0') ||
+          button.querySelector('span');
+
+        if (textContainer) {
+          textContainer.innerHTML = `
+            <span class="block text-sm font-semibold ${colors.title}">
+              ${escapeTapCartaHtml(view.title)}
+            </span>
+            <span class="mt-0.5 block text-xs ${colors.subtitle}">
+              ${escapeTapCartaHtml(view.subtitle)}
+            </span>
+          `;
+        }
+
+        if (window.lucide) {
+          lucide.createIcons();
+        }
+      }
+
+      function displayTapCartaRestoRelease(release) {
+        clearInterval(tapCartaRestoCountdownTimer);
+
+        const refreshDisplay = () => {
+          const view = getTapCartaRestoUpdateView(release);
+          renderTapCartaRestoUpdateButton(view);
+
+          if (view.status !== 'stabilizing') {
+            clearInterval(tapCartaRestoCountdownTimer);
+            tapCartaRestoCountdownTimer = null;
+          }
+        };
+
+        refreshDisplay();
+
+        if (getTapCartaRestoUpdateView(release).status === 'stabilizing') {
+          tapCartaRestoCountdownTimer = setInterval(refreshDisplay, 1000);
+        }
+      }
+
+      async function loadTapCartaRestoReleaseStatus() {
+        const { data: sessionData } =
+          await tapCartaSupabase.auth.getSession();
+
+        if (!sessionData.session) {
+          displayTapCartaRestoRelease(null);
+          return;
+        }
+
+        const { data, error } = await tapCartaSupabase
+          .from('app_release_versions')
+          .select(`
+            version,
+            release_status,
+            published_at,
+            stabilization_minutes
+          `)
+          .eq('app_key', TAPCARTA_RESTO_APP_KEY)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.error(
+            'Lecture impossible de la release Resto :',
+            error
+          );
+
+          renderTapCartaRestoUpdateButton({
+            status: 'neutral',
+            icon: 'refresh-cw',
+            title: 'Mises à jour Resto',
+            subtitle: 'Vérification indisponible'
+          });
+
+          return;
+        }
+
+        displayTapCartaRestoRelease(data?.[0] || null);
+      }
+
+      function initializeTapCartaRestoReleaseStatus() {
+        loadTapCartaRestoReleaseStatus();
+
+        tapCartaRestoRefreshTimer = setInterval(
+          loadTapCartaRestoReleaseStatus,
+          TAPCARTA_RELEASE_REFRESH_MS
+        );
+
+        tapCartaSupabase.auth.onAuthStateChange(() => {
+          window.setTimeout(loadTapCartaRestoReleaseStatus, 0);
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener(
+          'DOMContentLoaded',
+          initializeTapCartaRestoReleaseStatus,
+          { once: true }
+        );
+      } else {
+        initializeTapCartaRestoReleaseStatus();
+      }
+    })();
+  </script>
 </body>
 </html>
