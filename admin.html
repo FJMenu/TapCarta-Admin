@@ -6,7 +6,7 @@
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.7.6';
+  const APP_VERSION = 'V2.3.8.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -81,49 +81,69 @@
   <div class="min-h-screen bg-dark text-cream">
     <div class="grid min-h-screen lg:grid-cols-[280px_1fr]">
       
-      <aside class="border-r border-white/10 bg-black/20 p-5">
-        <div class="mb-8">
-          <h1 class="font-display text-2xl text-gold">TapCarta</h1>
-          <p class="text-sm text-cream/60 mt-1">Admin interne</p>
-        </div>
+<aside class="flex flex-col border-r border-white/10 bg-black/20 p-5 lg:sticky lg:top-0 lg:h-screen lg:self-start">
+  <div class="mb-8">
+    <h1 class="font-display text-2xl text-gold">TapCarta</h1>
+    <p class="text-sm text-cream/60 mt-1">Admin interne</p>
+  </div>
 
-        <div class="mb-6">
-          <label class="block text-xs uppercase tracking-wide text-cream/50 mb-2">
-            Établissement
-          </label>
-          <select id="restaurant-select" class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none">
-            <option>Chargement...</option>
-          </select>
-        </div>
-<nav class="space-y-2">
-  <button
-    id="nav-establishments-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
-  >
-    <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
-    <span>Établissement</span>
-  </button>
+  <div class="mb-6">
+    <label class="block text-xs uppercase tracking-wide text-cream/50 mb-2">
+      Établissement
+    </label>
+    <select id="restaurant-select" class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none">
+      <option>Chargement...</option>
+    </select>
+  </div>
 
-  <button
-    id="nav-modules-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
-  >
-    <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
-    <span>Modules</span>
-  </button>
+  <nav class="space-y-2">
+    <button
+      id="nav-establishments-btn"
+      type="button"
+      class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
+    >
+      <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
+      <span>Établissement</span>
+    </button>
 
-  <button
-    id="nav-billing-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
-  >
-    <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
-    <span>Contrat / Facturation</span>
-  </button>
-</nav>
-      </aside>
+    <button
+      id="nav-modules-btn"
+      type="button"
+      class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
+    >
+      <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
+      <span>Modules</span>
+    </button>
+
+    <button
+      id="nav-billing-btn"
+      type="button"
+      class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
+    >
+      <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
+      <span>Contrat / Facturation</span>
+    </button>
+  </nav>
+
+  <div class="mt-auto border-t border-white/10 pt-5">
+    <button
+      id="nav-resto-updates-btn"
+      type="button"
+      class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition-colors hover:bg-white/[0.06]"
+    >
+      <i data-lucide="refresh-cw" class="h-5 w-5 shrink-0 text-cream/70"></i>
+
+      <span class="min-w-0">
+        <span class="block text-sm font-semibold text-cream">
+          Mises à jour Resto
+        </span>
+        <span class="mt-0.5 block text-xs text-cream/55">
+          Vérification des mises à jour
+        </span>
+      </span>
+    </button>
+  </div>
+</aside>
 
       <main class="p-5 md:p-8">
 <header class="mb-8 flex flex-col gap-4">
