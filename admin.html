@@ -81,110 +81,83 @@
   <div class="min-h-screen bg-dark text-cream">
     <div class="grid min-h-screen lg:grid-cols-[280px_1fr]">
       
-      <aside class="border-r border-white/10 bg-black/20 p-5">
-        <div class="mb-8">
-          <h1 class="font-display text-2xl text-gold">TapCarta</h1>
-          <p class="text-sm text-cream/60 mt-1">Admin interne</p>
-        </div>
+function setTapCartaRestoReleaseControlState({
+  tone = 'neutral',
+  title = 'Vérification des mises à jour',
+  detail = 'Connexion Admin requise',
+  icon = 'rocket'
+} = {}) {
+  const button = document.getElementById('resto-release-control-btn');
+  const iconSlot = document.getElementById('resto-release-control-icon');
+  const titleElement = document.getElementById('resto-release-control-title');
+  const detailElement = document.getElementById('resto-release-control-detail');
 
-        <div class="mb-6">
-          <label class="block text-xs uppercase tracking-wide text-cream/50 mb-2">
-            Établissement
-          </label>
-          <select id="restaurant-select" class="w-full rounded-xl border border-gold/25 bg-darkCard px-4 py-3 text-sm text-cream outline-none">
-            <option>Chargement...</option>
-          </select>
-        </div>
-<nav class="space-y-2">
-  <button
-    id="nav-establishments-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
-  >
-    <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
-    <span>Établissement</span>
-  </button>
+  if (!button || !iconSlot || !titleElement || !detailElement) {
+    return;
+  }
 
-  <button
-    id="nav-modules-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
-  >
-    <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
-    <span>Modules</span>
-  </button>
+  const styles = {
+    neutral: {
+      border: 'rgba(255,255,255,0.10)',
+      background: 'rgba(255,255,255,0.03)',
+      iconColor: 'rgba(250,246,238,0.70)',
+      titleColor: '#FAF6EE',
+      detailColor: 'rgba(250,246,238,0.55)'
+    },
+    stabilizing: {
+      border: 'rgba(251,146,60,0.48)',
+      background: 'rgba(249,115,22,0.11)',
+      iconColor: '#FDBA74',
+      titleColor: '#FED7AA',
+      detailColor: 'rgba(254,215,170,0.82)'
+    },
+    deployed: {
+      border: 'rgba(74,222,128,0.42)',
+      background: 'rgba(34,197,94,0.10)',
+      iconColor: '#86EFAC',
+      titleColor: '#BBF7D0',
+      detailColor: 'rgba(187,247,208,0.82)'
+    },
+    blocked: {
+      border: 'rgba(248,113,113,0.42)',
+      background: 'rgba(239,68,68,0.10)',
+      iconColor: '#FCA5A5',
+      titleColor: '#FECACA',
+      detailColor: 'rgba(254,202,202,0.82)'
+    },
+    error: {
+      border: 'rgba(251,191,36,0.38)',
+      background: 'rgba(245,158,11,0.09)',
+      iconColor: '#FCD34D',
+      titleColor: '#FEF3C7',
+      detailColor: 'rgba(254,243,199,0.78)'
+    }
+  };
 
-  <button
-    id="nav-billing-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
-  >
-    <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
-    <span>Contrat / Facturation</span>
-  </button>
+  const style = styles[tone] || styles.neutral;
 
-  <div class="mt-5 border-t border-white/10 pt-5">
-    <button
-      id="resto-release-control-btn"
-      type="button"
-      class="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition-colors"
-    >
-      <div class="flex items-start gap-3">
-        <div
-          id="resto-release-control-icon"
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-black/20"
-        >
-          <i
-            data-lucide="rocket"
-            class="h-4 w-4 text-cream/70"
-          ></i>
-        </div>
+  button.dataset.releaseState = tone;
+  button.title = detail;
+  button.setAttribute('aria-label', `${title}. ${detail}`);
 
-        <div class="min-w-0 flex-1">
-          <div
-            id="resto-release-control-title"
-            class="text-sm font-bold text-cream"
-          >
-            Vérification des mises à jour
-          </div>
+  button.style.borderColor = style.border;
+  button.style.background = style.background;
 
-          <div
-            id="resto-release-control-detail"
-            class="mt-1 text-xs leading-relaxed text-cream/55"
-          >
-            Connexion Admin requise
-          </div>
-        </div>
-      </div>
-    </button>
-  </div>
-</nav>
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-gold/20 bg-gold/10 px-4 py-3 text-sm font-semibold text-cream"
-  >
-    <i data-lucide="building-2" class="w-4 h-4 text-gold"></i>
-    <span>Établissement</span>
-  </button>
+  iconSlot.style.color = style.iconColor;
+  titleElement.style.color = style.titleColor;
+  detailElement.style.color = style.detailColor;
 
-  <button
-    id="nav-modules-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
-  >
-    <i data-lucide="toggle-left" class="w-4 h-4 text-gold"></i>
-    <span>Modules</span>
-  </button>
+  titleElement.textContent = title;
+  detailElement.textContent = detail;
 
-  <button
-    id="nav-billing-btn"
-    type="button"
-    class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-cream/80"
-  >
-    <i data-lucide="file-text" class="w-4 h-4 text-gold"></i>
-    <span>Contrat / Facturation</span>
-  </button>
-</nav>
-      </aside>
+  iconSlot.innerHTML = `
+    <i data-lucide="${icon}" class="h-4 w-4"></i>
+  `;
+
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
 
       <main class="p-5 md:p-8">
 <header class="mb-8 flex flex-col gap-4">
