@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
 <title>TapCarta Admin</title>
 
 <script>
-  const APP_VERSION = 'V2.3.8.3';
+  const APP_VERSION = 'V2.4.1.1';
 </script>
 
 <link rel="icon" type="image/png" href="./favicon.png?v=1.0.13">
@@ -80,7 +81,7 @@
 <body>
   <div class="min-h-screen bg-dark text-cream">
     <div class="grid min-h-screen lg:grid-cols-[280px_1fr]">
-      
+
 <aside class="border-r border-white/10 bg-black/20 p-5">
   <div class="mb-8">
     <h1 class="font-display text-2xl text-gold">TapCarta</h1>
@@ -131,29 +132,29 @@
 
   <div class="mt-32 border-t border-white/10 pt-5">
     <button
-      id="nav-resto-updates-btn"
+      id="nav-publications-btn"
       type="button"
       class="w-full flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left"
     >
       <i
-        id="nav-resto-updates-icon"
+        id="nav-publications-icon"
         data-lucide="refresh-cw"
         class="h-4 w-4 shrink-0 text-cream/70"
       ></i>
 
       <span class="min-w-0">
         <span
-          id="nav-resto-updates-title"
+          id="nav-publications-title"
           class="block text-sm font-semibold text-cream"
         >
-          Mises à jour Resto
+          Publications
         </span>
 
         <span
-          id="nav-resto-updates-subtitle"
+          id="nav-publications-subtitle"
           class="mt-0.5 block text-xs text-cream/55"
         >
-          Vérification des mises à jour
+          5 applications · V + UUID
         </span>
       </span>
     </button>
@@ -213,6 +214,38 @@
     </div>
   </div>
 </header>
+<section
+  id="publications-section"
+  class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6"
+>
+  <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h3 class="font-display text-xl font-bold text-cream">
+        Publications
+      </h3>
+    </div>
+
+    <button
+      id="reload-publications-btn"
+      type="button"
+      class="rounded-xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-semibold text-gold"
+    >
+      Recharger
+    </button>
+  </div>
+
+  <div
+    id="publications-status"
+    class="mb-4 text-sm text-cream/60"
+  >
+    Connecte-toi pour afficher les publications.
+  </div>
+
+  <div
+    id="publications-list"
+    class="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+  ></div>
+</section>
 
 <section class="mb-6 rounded-[24px] border border-gold/18 bg-gradient-to-br from-white/[0.04] to-white/[0.015] p-5 md:p-6">
   <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -437,7 +470,7 @@
     type="text"
     readonly
     class="mt-3 w-full rounded-xl border border-gold/20 bg-black/25 px-4 py-3 text-sm text-gold outline-none"
-    placeholder="https://tapcarta.com/r/?c=code-stable"
+    placeholder="https://tapcarta.com/nom-du-restaurant-ville/"
   >
 
   <div class="mt-3 flex flex-col gap-2 md:flex-row">
@@ -1980,11 +2013,6 @@ function buildTapCartaPublicUrlFromSlug(slug) {
   return `https://tapcarta.com/${safeSlug}/`;
 }
 
-function buildTapCartaQrUrlFromCode(qrCode) {
-  const safeCode = normalizeTapCartaManualSlug(qrCode);
-  if (!safeCode) return '';
-  return `https://tapcarta.com/r/${safeCode}/`;
-}
 
 function generateTapCartaStableQrCode(name = '', city = '') {
   const seed = normalizeTapCartaManualSlug(`${name}-${city}`);
@@ -2104,7 +2132,6 @@ async function createManualRestaurantFromAdmin(form, modal) {
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const candidateCode = generateTapCartaStableQrCode(restaurantName, restaurantCity);
-      const candidateUrl = buildTapCartaQrUrlFromCode(candidateCode);
 
       const { data: existingQr, error: qrCheckError } = await tapCartaSupabase
         .from('restaurants')
@@ -2118,7 +2145,7 @@ async function createManualRestaurantFromAdmin(form, modal) {
 
       if (!existingQr?.id) {
         qrCode = candidateCode;
-        qrUrl = candidateUrl;
+        qrUrl = publicUrl;
         break;
       }
     }
@@ -2225,7 +2252,7 @@ async function createManualRestaurantFromAdmin(form, modal) {
           <div><strong>${restaurantName}</strong> a été créé en pack <strong>${packLabel}</strong>.</div>
           <div>URL publique : <strong>${publicUrl}</strong></div>
           <div>URL QR durable : <strong>${qrUrl}</strong></div>
-          <div class="text-cream/60">L’URL QR durable a été copiée automatiquement si le navigateur l’a autorisé. Génère le QR encadré avec cette URL, pas avec l’URL publique.</div>
+          <div class="text-cream/60">L’URL utilisée par le QR est exactement l’URL publique définitive du restaurant.</div>
         </div>
       `,
       buttonLabel: 'Compris',
@@ -2260,8 +2287,7 @@ function showTapCartaManualRestaurantModal() {
       <div class="mb-5">
         <div class="font-display text-2xl text-cream">Créer un établissement manuel</div>
         <div class="mt-2 text-sm leading-relaxed text-cream/70">
-          Création super-admin sans demande publique. Pour les nouvelles créations, l’URL publique utilise le nom et la ville,
-          tandis que l’URL QR durable reste indépendante du nom et du lieu.
+          Création super-admin sans demande publique. L’URL utilisée par le QR est exactement l’URL publique définitive du restaurant.
         </div>
       </div>
 
@@ -2319,9 +2345,8 @@ function showTapCartaManualRestaurantModal() {
             QR durable
           </div>
           <div class="mt-2 text-sm leading-relaxed text-cream/70">
-            Admin générera automatiquement une URL QR durable du type
-            <strong>tapcarta.com/r/code-stable/</strong>. Utilise cette URL pour générer le QR encadré TapCarta.
-            Le QR ne dépendra pas du nom ni de la ville.
+            Admin utilisera exactement l’URL publique définitive du restaurant pour générer le QR encadré TapCarta.
+            Aucune URL technique distincte ne sera créée.
           </div>
         </div>
 
@@ -5933,9 +5958,9 @@ function fillForm(data) {
   const qrUrlField = document.getElementById('field-qr-url');
   if (qrUrlField) {
     qrUrlField.value =
-      data.links?.qrUrl ||
-      data.links?.qrPublicUrl ||
-      data.technical?.qrUrl ||
+      data.links?.publicPage ||
+      data.links?.clientMenuUrl ||
+      data.technical?.clientMenuUrl ||
       '';
   }
 
@@ -6624,6 +6649,7 @@ async function saveCurrentRestaurantToSupabase() {
       slug: restaurantSlug,
       pack_code: packCode,
       public_url: publicUrl,
+      qr_url: publicUrl,
       logo_storage_path: logoStoragePath,
       logo_url: logoUrl,
       app_icon_storage_path: appIconStoragePath,
@@ -6886,9 +6912,11 @@ function bindFormEvents() {
     const normalizedSlug = normalizeTapCartaSlug(e.target.value);
     currentRestaurantData.links.slug = normalizedSlug;
     currentRestaurantData.links.publicPage = buildTapCartaPublicUrl(normalizedSlug);
+    currentRestaurantData.links.qrUrl = currentRestaurantData.links.publicPage;
 
     e.target.value = normalizedSlug;
     document.getElementById('field-public-page').value = currentRestaurantData.links.publicPage;
+    document.getElementById('field-qr-url').value = currentRestaurantData.links.publicPage;
 
     markDirty();
   });
@@ -6901,6 +6929,13 @@ function bindFormEvents() {
     }
 
     currentRestaurantData.links.publicPage = e.target.value.trim();
+    currentRestaurantData.links.qrUrl = currentRestaurantData.links.publicPage;
+
+    const qrUrlField = document.getElementById('field-qr-url');
+    if (qrUrlField) {
+      qrUrlField.value = currentRestaurantData.links.publicPage;
+    }
+
     markDirty();
   });
   const copyQrUrlButton = document.getElementById('copy-qr-url-btn');
@@ -7624,7 +7659,7 @@ async function loadRestaurantData(id) {
       city: restaurant.city || '',
       publicPage: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || ''),
       qrCode: restaurant.qr_code || '',
-      qrUrl: restaurant.qr_url || '',
+      qrUrl: restaurant.public_url || buildTapCartaPublicUrl(restaurant.slug || ''),
       restoUrl: restaurant.resto_url || '',
       logoStoragePath: restaurant.logo_storage_path || '',
       logoUrl: restaurant.logo_url || '',
@@ -8736,18 +8771,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   </script>
 
-  <script>
+    <script>
     (() => {
-      if (window.__tapCartaRestoReleaseStatusLoaded) return;
-      window.__tapCartaRestoReleaseStatusLoaded = true;
+      if (window.__tapCartaPublicationsLoaded) return;
+      window.__tapCartaPublicationsLoaded = true;
 
-      const TAPCARTA_RESTO_APP_KEY = 'tapcarta-resto';
-      const TAPCARTA_RELEASE_REFRESH_MS = 60000;
+      const TAPCARTA_RELEASE_APPS = [
+        {
+          appKey: 'tapcarta-site',
+          label: 'tapcarta.com'
+        },
+        {
+          appKey: 'tapcarta-restaurants',
+          label: 'Index restaurants'
+        },
+        {
+          appKey: 'tapcarta-standard',
+          label: 'Standard public'
+        },
+        {
+          appKey: 'tapcarta-resto',
+          label: 'Espace restaurateur'
+        },
+        {
+          appKey: 'tapcarta-admin',
+          label: 'Admin TapCarta'
+        }
+      ];
 
-      let tapCartaRestoCountdownTimer = null;
-      let tapCartaRestoRefreshTimer = null;
+      const TAPCARTA_PUBLICATIONS_REFRESH_MS = 60000;
+      let tapCartaPublicationsRefreshTimer = null;
 
-      function escapeTapCartaHtml(value) {
+      function escapeTapCartaPublicationHtml(value) {
         return String(value ?? '')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -8756,234 +8811,166 @@ document.addEventListener('DOMContentLoaded', async () => {
           .replace(/'/g, '&#039;');
       }
 
-      function formatTapCartaRemainingTime(remainingMs) {
-        const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
+      function renderTapCartaPublications(releasesByApp) {
+        const list =
+          document.getElementById('publications-list');
 
-        if (hours > 0) {
-          return `${hours} h ${String(minutes).padStart(2, '0')} min`;
-        }
+        if (!list) return;
 
-        if (minutes > 0) {
-          return `${minutes} min ${String(seconds).padStart(2, '0')} s`;
-        }
+        list.innerHTML = TAPCARTA_RELEASE_APPS.map((app) => {
+          const release = releasesByApp.get(app.appKey);
+          const version = release?.version || '—';
+          const releaseId = release?.id || '—';
 
-        return `${seconds} s`;
-      }
+          return `
+            <article class="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <div class="text-sm font-bold text-gold">
+                ${escapeTapCartaPublicationHtml(app.label)}
+              </div>
 
-      function getTapCartaRestoUpdateView(release) {
-        if (!release) {
-          return {
-            status: 'neutral',
-            icon: 'refresh-cw',
-            title: 'Mises à jour Resto',
-            subtitle: 'Vérification des mises à jour'
-          };
-        }
+              <div class="mt-4 space-y-3">
+                <div>
+                  <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                    V
+                  </div>
+                  <div class="mt-1 text-sm font-semibold text-cream">
+                    ${escapeTapCartaPublicationHtml(version)}
+                  </div>
+                </div>
 
-        const version = release.version || 'Version non précisée';
-        const releaseStatus = String(release.release_status || '').toLowerCase();
-
-        if (releaseStatus === 'blocked' || releaseStatus === 'refused') {
-          return {
-            status: 'refused',
-            icon: 'circle-x',
-            title: 'Mise à jour refusée',
-            subtitle: `${version} · Contrôle requis`
-          };
-        }
-
-        if (releaseStatus === 'published') {
-          const publishedAtMs = new Date(release.published_at).getTime();
-          const stabilizationMs =
-            Number(release.stabilization_minutes || 0) * 60 * 1000;
-
-          const stabilizationEndsAt =
-            publishedAtMs + stabilizationMs;
-
-          const remainingMs = stabilizationEndsAt - Date.now();
-
-          if (
-            Number.isFinite(publishedAtMs) &&
-            stabilizationMs > 0 &&
-            remainingMs > 0
-          ) {
-            return {
-              status: 'stabilizing',
-              icon: 'clock-3',
-              title: 'Mise à jour en stabilisation',
-              subtitle: `${version} · ${formatTapCartaRemainingTime(remainingMs)}`
-            };
-          }
-
-          return {
-            status: 'deployed',
-            icon: 'circle-check',
-            title: 'Mise à jour déployée',
-            subtitle: `${version} · Publiée`
-          };
-        }
-
-        return {
-          status: 'neutral',
-          icon: 'refresh-cw',
-          title: 'Mises à jour Resto',
-          subtitle: 'Vérification des mises à jour'
-        };
-      }
-
-      function renderTapCartaRestoUpdateButton(view) {
-        const button = document.getElementById('nav-resto-updates-btn');
-
-        if (!button) return;
-
-        const visualClasses = {
-          neutral: {
-            button: 'border-white/10 bg-white/[0.03]',
-            icon: 'text-cream/70',
-            title: 'text-cream',
-            subtitle: 'text-cream/55'
-          },
-          stabilizing: {
-            button: 'border-amber-400/35 bg-amber-500/10',
-            icon: 'text-amber-300',
-            title: 'text-amber-200',
-            subtitle: 'text-amber-200/75'
-          },
-          deployed: {
-            button: 'border-emerald-400/35 bg-emerald-500/10',
-            icon: 'text-emerald-300',
-            title: 'text-emerald-200',
-            subtitle: 'text-emerald-200/75'
-          },
-          refused: {
-            button: 'border-red-400/30 bg-red-500/10',
-            icon: 'text-red-300',
-            title: 'text-red-200',
-            subtitle: 'text-red-200/75'
-          }
-        };
-
-        const colors =
-          visualClasses[view.status] || visualClasses.neutral;
-
-        button.className =
-          `w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${colors.button}`;
-
-        const currentIcon = button.querySelector('[data-lucide], svg');
-
-        if (currentIcon) {
-          currentIcon.outerHTML = `
-            <i
-              data-lucide="${escapeTapCartaHtml(view.icon)}"
-              class="h-4 w-4 shrink-0 ${colors.icon}"
-            ></i>
+                <div>
+                  <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                    UUID
+                  </div>
+                  <div class="mt-1 break-all font-mono text-xs text-cream/75">
+                    ${escapeTapCartaPublicationHtml(releaseId)}
+                  </div>
+                </div>
+              </div>
+            </article>
           `;
-        }
-
-        const textContainer =
-          button.querySelector('.min-w-0') ||
-          button.querySelector('span');
-
-        if (textContainer) {
-          textContainer.innerHTML = `
-            <span class="block text-sm font-semibold ${colors.title}">
-              ${escapeTapCartaHtml(view.title)}
-            </span>
-            <span class="mt-0.5 block text-xs ${colors.subtitle}">
-              ${escapeTapCartaHtml(view.subtitle)}
-            </span>
-          `;
-        }
-
-        if (window.lucide) {
-          lucide.createIcons();
-        }
+        }).join('');
       }
 
-      function displayTapCartaRestoRelease(release) {
-        clearInterval(tapCartaRestoCountdownTimer);
+      async function loadTapCartaPublications() {
+        const status =
+          document.getElementById('publications-status');
 
-        const refreshDisplay = () => {
-          const view = getTapCartaRestoUpdateView(release);
-          renderTapCartaRestoUpdateButton(view);
+        const list =
+          document.getElementById('publications-list');
 
-          if (view.status !== 'stabilizing') {
-            clearInterval(tapCartaRestoCountdownTimer);
-            tapCartaRestoCountdownTimer = null;
-          }
-        };
+        if (!status || !list) return;
 
-        refreshDisplay();
-
-        if (getTapCartaRestoUpdateView(release).status === 'stabilizing') {
-          tapCartaRestoCountdownTimer = setInterval(refreshDisplay, 1000);
-        }
-      }
-
-      async function loadTapCartaRestoReleaseStatus() {
         const { data: sessionData } =
           await tapCartaSupabase.auth.getSession();
 
         if (!sessionData.session) {
-          displayTapCartaRestoRelease(null);
+          status.textContent =
+            'Connecte-toi pour afficher les publications.';
+
+          renderTapCartaPublications(new Map());
           return;
         }
+
+        status.textContent = 'Chargement...';
+
+        const appKeys =
+          TAPCARTA_RELEASE_APPS.map((app) => app.appKey);
 
         const { data, error } = await tapCartaSupabase
           .from('app_release_versions')
           .select(`
+            id,
+            app_key,
             version,
-            release_status,
-            published_at,
-            stabilization_minutes
+            created_at
           `)
-          .eq('app_key', TAPCARTA_RESTO_APP_KEY)
+          .in('app_key', appKeys)
           .order('created_at', { ascending: false })
-          .limit(1);
+          .order('id', { ascending: false });
 
         if (error) {
           console.error(
-            'Lecture impossible de la release Resto :',
+            'Lecture impossible des publications TapCarta :',
             error
           );
 
-          renderTapCartaRestoUpdateButton({
-            status: 'neutral',
-            icon: 'refresh-cw',
-            title: 'Mises à jour Resto',
-            subtitle: 'Vérification indisponible'
-          });
+          status.textContent =
+            'Lecture des publications indisponible.';
 
+          renderTapCartaPublications(new Map());
           return;
         }
 
-        displayTapCartaRestoRelease(data?.[0] || null);
+        const releasesByApp = new Map();
+
+        for (const release of data || []) {
+          if (
+            release?.app_key &&
+            !releasesByApp.has(release.app_key)
+          ) {
+            releasesByApp.set(
+              release.app_key,
+              release
+            );
+          }
+        }
+
+        renderTapCartaPublications(releasesByApp);
+        status.textContent = '';
       }
 
-      function initializeTapCartaRestoReleaseStatus() {
-        loadTapCartaRestoReleaseStatus();
+      function initializeTapCartaPublications() {
+        const navButton =
+          document.getElementById('nav-publications-btn');
 
-        tapCartaRestoRefreshTimer = setInterval(
-          loadTapCartaRestoReleaseStatus,
-          TAPCARTA_RELEASE_REFRESH_MS
-        );
+        const reloadButton =
+          document.getElementById('reload-publications-btn');
+
+        if (navButton) {
+          navButton.addEventListener('click', async () => {
+            await loadTapCartaPublications();
+
+            document
+              .getElementById('publications-section')
+              ?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+              });
+          });
+        }
+
+        if (reloadButton) {
+          reloadButton.addEventListener(
+            'click',
+            loadTapCartaPublications
+          );
+        }
+
+        loadTapCartaPublications();
+
+        tapCartaPublicationsRefreshTimer =
+          window.setInterval(
+            loadTapCartaPublications,
+            TAPCARTA_PUBLICATIONS_REFRESH_MS
+          );
 
         tapCartaSupabase.auth.onAuthStateChange(() => {
-          window.setTimeout(loadTapCartaRestoReleaseStatus, 0);
+          window.setTimeout(
+            loadTapCartaPublications,
+            0
+          );
         });
       }
 
       if (document.readyState === 'loading') {
         document.addEventListener(
           'DOMContentLoaded',
-          initializeTapCartaRestoReleaseStatus,
+          initializeTapCartaPublications,
           { once: true }
         );
       } else {
-        initializeTapCartaRestoReleaseStatus();
+        initializeTapCartaPublications();
       }
     })();
   </script>
