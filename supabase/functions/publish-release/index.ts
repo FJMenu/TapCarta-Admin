@@ -1,4 +1,4 @@
-﻿import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 declare const Deno: {
   serve: (handler: (req: Request) => Response | Promise<Response>) => void;
@@ -45,6 +45,10 @@ const APP_PROJECT_MAP: Record<string, string> = {
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers":
+    "authorization, apikey, content-type, x-client-info",
+  "access-control-allow-methods": "POST, OPTIONS",
 };
 
 function jsonResponse(
