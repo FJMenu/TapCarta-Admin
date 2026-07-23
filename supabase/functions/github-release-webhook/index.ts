@@ -1,6 +1,6 @@
-﻿// GitHub push webhook — première étape en lecture seule.
-// Cette version vérifie la signature et identifie les applications touchées.
-// Elle n'écrit pas encore dans Supabase et ne déclenche aucune publication.
+﻿// GitHub push webhook — création technique des publications.
+// Vérité technique : UUID + application + SHA GitHub.
+// La version V... reste un simple libellé visuel humain.
 
 declare const Deno: {
   serve: (handler: (req: Request) => Response | Promise<Response>) => void;
@@ -22,8 +22,23 @@ type GitHubPushPayload = {
     full_name?: string;
   };
   commits?: GitHubCommit[];
-  head_commit?: GitHubCommit | null;
 };
+
+type ExistingRelease = {
+  id: string;
+  app_key: string;
+  version: string;
+  release_commit_sha: string | null;
+  release_status: string;
+  created_at: string;
+};
+
+type CreatedRelease = ExistingRelease & {
+  stabilization_started_at: string | null;
+  stabilization_ends_at: string | null;
+};
+
+const STABILIZATION_MINUTES = 120;
 
 const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
@@ -115,9 +130,7 @@ async function verifyGitHubSignature(
 function collectChangedFiles(payload: GitHubPushPayload): string[] {
   const changedFiles = new Set<string>();
 
-  const commits = payload.commits ?? [];
-
-  for (const commit of commits) {
+  for (const commit of payload.commits ?? []) {
     for (
       const file of [
         ...(commit.added ?? []),
@@ -148,6 +161,155 @@ function detectMasterApplications(changedFiles: string[]): string[] {
   return [...applications].sort();
 }
 
+function databaseHeaders(serviceRoleKey: string): HeadersInit {
+  return {
+    apikey: serviceRoleKey,
+    authorization: `Bearer ${serviceRoleKey}`,
+    "content-type": "application/json",
+  };
+}
+
+async function findReleaseForCommit(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  appKey: string,
+  commitSha: string,
+): Promise<ExistingRelease | null> {
+  const url = new URL(
+    `${supabaseUrl}/rest/v1/app_release_versions`,
+  );
+
+  url.searchParams.set(
+    "select",
+    "id,app_key,version,release_commit_sha,release_status,created_at",
+  );
+  url.searchParams.set("app_key", `eq.${appKey}`);
+  url.searchParams.set("release_commit_sha", `eq.${commitSha}`);
+  url.searchParams.set("limit", "1");
+
+  const response = await fetch(url, {
+    headers: databaseHeaders(serviceRoleKey),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Recherche du SHA impossible pour ${appKey}: ` +
+        `${response.status} ${await response.text()}`,
+    );
+  }
+
+  const rows = await response.json() as ExistingRelease[];
+  return rows[0] ?? null;
+}
+
+async function getHumanDisplayVersion(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  appKey: string,
+): Promise<string> {
+  const url = new URL(
+    `${supabaseUrl}/rest/v1/app_release_versions`,
+  );
+
+  url.searchParams.set("select", "version");
+  url.searchParams.set("app_key", `eq.${appKey}`);
+  url.searchParams.set("order", "created_at.desc");
+  url.searchParams.set("limit", "1");
+
+  const response = await fetch(url, {
+    headers: databaseHeaders(serviceRoleKey),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Lecture de la version visuelle impossible pour ${appKey}: ` +
+        `${response.status} ${await response.text()}`,
+    );
+  }
+
+  const rows = await response.json() as Array<{ version?: string }>;
+  const version = String(rows[0]?.version ?? "").trim();
+
+  return version || "V0.0.0.0";
+}
+
+async function createRelease(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  appKey: string,
+  commitSha: string,
+  repository: string,
+  ref: string,
+  changedFiles: string[],
+  deliveryId: string | null,
+): Promise<CreatedRelease> {
+  const version = await getHumanDisplayVersion(
+    supabaseUrl,
+    serviceRoleKey,
+    appKey,
+  );
+
+  const stabilizationStartedAt = new Date();
+  const stabilizationEndsAt = new Date(
+    stabilizationStartedAt.getTime() +
+      STABILIZATION_MINUTES * 60 * 1000,
+  );
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/app_release_versions`,
+    {
+      method: "POST",
+      headers: {
+        ...databaseHeaders(serviceRoleKey),
+        prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        app_key: appKey,
+        version,
+        release_commit_sha: commitSha,
+        release_status: "stabilizing",
+        stabilization_minutes: STABILIZATION_MINUTES,
+        stabilization_started_at:
+          stabilizationStartedAt.toISOString(),
+        stabilization_ends_at:
+          stabilizationEndsAt.toISOString(),
+        stabilization_completed_at: null,
+        published_at: null,
+        decision_at: null,
+        decision_reason: null,
+        vercel_deployment_id: null,
+        vercel_deployment_url: null,
+        release_notes: {
+          source: "github_push_webhook",
+          repository,
+          ref,
+          github_delivery_id: deliveryId,
+          changed_files: changedFiles,
+          human_version_policy:
+            "display_only_copied_from_latest_known_release",
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Création impossible pour ${appKey}: ` +
+        `${response.status} ${await response.text()}`,
+    );
+  }
+
+  const rows = await response.json() as CreatedRelease[];
+
+  if (!rows[0]) {
+    throw new Error(
+      `Supabase n'a retourné aucune publication pour ${appKey}.`,
+    );
+  }
+
+  return rows[0];
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "POST") {
     return jsonResponse(405, {
@@ -156,9 +318,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  const secret = Deno.env.get("GITHUB_WEBHOOK_SECRET");
+  const webhookSecret = Deno.env.get("GITHUB_WEBHOOK_SECRET");
 
-  if (!secret) {
+  if (!webhookSecret) {
     console.error("GITHUB_WEBHOOK_SECRET is missing.");
 
     return jsonResponse(500, {
@@ -172,7 +334,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const signatureValid = await verifyGitHubSignature(
     rawBody,
     req.headers.get("x-hub-signature-256"),
-    secret,
+    webhookSecret,
   );
 
   if (!signatureValid) {
@@ -222,7 +384,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const repository = payload.repository?.full_name ?? "";
   const commitSha = payload.after ?? "";
-  const changedFiles = collectChangedFiles(payload);
 
   if (!/^[0-9a-f]{40}$/i.test(commitSha)) {
     return jsonResponse(400, {
@@ -241,17 +402,94 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  const affectedApplications = detectMasterApplications(changedFiles);
+  const changedFiles = collectChangedFiles(payload);
+  const affectedApplications =
+    detectMasterApplications(changedFiles);
 
-  return jsonResponse(200, {
-    ok: true,
-    dry_run: true,
-    repository,
-    ref: payload.ref,
-    commit_sha: commitSha,
-    changed_files: changedFiles,
-    affected_applications: affectedApplications,
-    message:
-      "Signature validée. Aucun UUID créé et aucune publication déclenchée.",
-  });
+  if (affectedApplications.length === 0) {
+    return jsonResponse(200, {
+      ok: true,
+      ignored: true,
+      reason: "no_application_path_affected",
+      repository,
+      commit_sha: commitSha,
+      changed_files: changedFiles,
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey =
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error(
+      "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing.",
+    );
+
+    return jsonResponse(500, {
+      ok: false,
+      error: "database_configuration_error",
+    });
+  }
+
+  const createdReleases: CreatedRelease[] = [];
+  const existingReleases: ExistingRelease[] = [];
+
+  try {
+    for (const appKey of affectedApplications) {
+      const existing = await findReleaseForCommit(
+        supabaseUrl,
+        serviceRoleKey,
+        appKey,
+        commitSha,
+      );
+
+      if (existing) {
+        existingReleases.push(existing);
+        continue;
+      }
+
+      const created = await createRelease(
+        supabaseUrl,
+        serviceRoleKey,
+        appKey,
+        commitSha,
+        repository,
+        payload.ref,
+        changedFiles,
+        req.headers.get("x-github-delivery"),
+      );
+
+      createdReleases.push(created);
+    }
+  } catch (error) {
+    console.error("github-release-webhook failed.", error);
+
+    return jsonResponse(500, {
+      ok: false,
+      error: "release_creation_failed",
+      details:
+        error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return jsonResponse(
+    createdReleases.length > 0 ? 201 : 200,
+    {
+      ok: true,
+      dry_run: false,
+      repository,
+      ref: payload.ref,
+      commit_sha: commitSha,
+      changed_files: changedFiles,
+      affected_applications: affectedApplications,
+      created_releases: createdReleases,
+      existing_releases: existingReleases,
+      vercel_triggered: false,
+      message:
+        createdReleases.length > 0
+          ? "UUID créé et délai de stabilisation démarré. Aucun appel Vercel."
+          : "Livraison déjà traitée. Aucun doublon créé.",
+    },
+  );
 });
