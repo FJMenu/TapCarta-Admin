@@ -416,3 +416,7 @@ enabled = true
 [functions.github-release-webhook]
 verify_jwt = false
 entrypoint = "./functions/github-release-webhook/index.ts"
+
+[functions.publish-release]
+verify_jwt = true
+entrypoint = "./functions/publish-release/index.ts"
