@@ -145,20 +145,111 @@ function collectChangedFiles(payload: GitHubPushPayload): string[] {
   return [...changedFiles].sort();
 }
 
+const MASTER_REPOSITORY = "fjmenu/tapcarta-master";
+const PUBLIC_REPOSITORY = "fjmenu/tapcarta-public";
+const ADMIN_REPOSITORY = "fjmenu/tapcarta-admin";
+
+const SHARED_DEPLOYMENT_FILES = new Set([
+  "vercel.json",
+  "package.json",
+  "package-lock.json",
+  "pnpm-lock.yaml",
+  "yarn.lock",
+]);
+
+function isRepositoryMetadataOnly(file: string): boolean {
+  const normalizedFile = file.toLowerCase();
+
+  return normalizedFile === "readme.md" ||
+    normalizedFile === ".gitignore" ||
+    normalizedFile.startsWith(".github/") ||
+    normalizedFile.startsWith(".vscode/") ||
+    normalizedFile.startsWith("docs/") ||
+    normalizedFile.startsWith("supabase/");
+}
+
 function detectMasterApplications(changedFiles: string[]): string[] {
   const applications = new Set<string>();
 
   for (const file of changedFiles) {
-    if (file.startsWith("standard-public/")) {
+    const normalizedFile = file.toLowerCase();
+
+    if (isRepositoryMetadataOnly(normalizedFile)) {
+      continue;
+    }
+
+    if (SHARED_DEPLOYMENT_FILES.has(normalizedFile)) {
+      applications.add("tapcarta-standard");
+      applications.add("tapcarta-resto");
+      continue;
+    }
+
+    if (normalizedFile.startsWith("standard-public/")) {
       applications.add("tapcarta-standard");
     }
 
-    if (file.startsWith("resto/")) {
+    if (normalizedFile.startsWith("resto/")) {
       applications.add("tapcarta-resto");
     }
   }
 
   return [...applications].sort();
+}
+
+function detectPublicApplications(changedFiles: string[]): string[] {
+  const applications = new Set<string>();
+
+  for (const file of changedFiles) {
+    const normalizedFile = file.toLowerCase();
+
+    if (isRepositoryMetadataOnly(normalizedFile)) {
+      continue;
+    }
+
+    if (SHARED_DEPLOYMENT_FILES.has(normalizedFile)) {
+      applications.add("tapcarta-site");
+      applications.add("tapcarta-restaurants");
+      continue;
+    }
+
+    if (normalizedFile.startsWith("restaurants/")) {
+      applications.add("tapcarta-restaurants");
+      continue;
+    }
+
+    applications.add("tapcarta-site");
+  }
+
+  return [...applications].sort();
+}
+
+function detectAdminApplications(changedFiles: string[]): string[] {
+  const hasAdminRuntimeChange = changedFiles.some((file) => {
+    const normalizedFile = file.toLowerCase();
+
+    return !isRepositoryMetadataOnly(normalizedFile);
+  });
+
+  return hasAdminRuntimeChange ? ["tapcarta-admin"] : [];
+}
+
+function detectAffectedApplications(
+  repository: string,
+  changedFiles: string[],
+): string[] | null {
+  switch (repository.toLowerCase()) {
+    case MASTER_REPOSITORY:
+      return detectMasterApplications(changedFiles);
+
+    case PUBLIC_REPOSITORY:
+      return detectPublicApplications(changedFiles);
+
+    case ADMIN_REPOSITORY:
+      return detectAdminApplications(changedFiles);
+
+    default:
+      return null;
+  }
 }
 
 function databaseHeaders(serviceRoleKey: string): HeadersInit {
@@ -392,19 +483,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
   }
 
-  if (repository !== "FJMenu/tapcarta-master") {
+  const changedFiles = collectChangedFiles(payload);
+  const affectedApplications = detectAffectedApplications(
+    repository,
+    changedFiles,
+  );
+
+  if (affectedApplications === null) {
     return jsonResponse(202, {
       ok: true,
       ignored: true,
-      reason: "repository_not_enabled_yet",
+      reason: "repository_not_enabled",
       repository,
       commit_sha: commitSha,
     });
   }
-
-  const changedFiles = collectChangedFiles(payload);
-  const affectedApplications =
-    detectMasterApplications(changedFiles);
 
   if (affectedApplications.length === 0) {
     return jsonResponse(200, {
