@@ -79,6 +79,304 @@
   </style>
 </head>
 <body>
+  <script>
+  (() => {
+    if (window.__tapCartaEnvironmentBannerLoaded) return;
+    window.__tapCartaEnvironmentBannerLoaded = true;
+
+    const hostname =
+      window.location.hostname.toLowerCase();
+
+    /*
+      Ajouter ici les domaines officiels de production.
+      admin.tapcarta.com sera le domaine définitif.
+    */
+    const TAPCARTA_ADMIN_PRODUCTION_HOSTS =
+      new Set([
+        'admin.tapcarta.com'
+      ]);
+
+    const escapeEnvironmentHtml = (value) =>
+      String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    const currentVersion =
+      typeof APP_VERSION !== 'undefined'
+        ? APP_VERSION
+        : 'Version inconnue';
+
+    let environment;
+
+    if (
+      hostname === 'github.io' ||
+      hostname.endsWith('.github.io')
+    ) {
+      environment = {
+        key: 'github',
+        title: 'TEST GITHUB — VERSION NON PUBLIÉE',
+        message:
+          'Les opérations réalisées ici peuvent modifier les vraies données Supabase.',
+        titlePrefix: '[TEST GITHUB]',
+        background:
+          'linear-gradient(90deg, #9a3412, #c2410c)',
+        border: '#fdba74',
+        text: '#fff7ed'
+      };
+    } else if (
+      TAPCARTA_ADMIN_PRODUCTION_HOSTS.has(
+        hostname
+      )
+    ) {
+      environment = {
+        key: 'production',
+        title:
+          'PRODUCTION VERCEL — DONNÉES RÉELLES',
+        message:
+          'Environnement officiel pour le travail quotidien.',
+        titlePrefix: '[PRODUCTION]',
+        background:
+          'linear-gradient(90deg, #14532d, #166534)',
+        border: '#86efac',
+        text: '#f0fdf4'
+      };
+    } else if (
+      hostname.endsWith('.vercel.app')
+    ) {
+      environment = {
+        key: 'preview',
+        title:
+          'PREVIEW VERCEL — VERSION NON PUBLIÉE',
+        message:
+          'Environnement de contrôle. Les opérations peuvent modifier les vraies données Supabase.',
+        titlePrefix: '[PREVIEW VERCEL]',
+        background:
+          'linear-gradient(90deg, #581c87, #6b21a8)',
+        border: '#d8b4fe',
+        text: '#faf5ff'
+      };
+    } else if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1'
+    ) {
+      environment = {
+        key: 'local',
+        title:
+          'ENVIRONNEMENT LOCAL — VERSION NON PUBLIÉE',
+        message:
+          'Les opérations peuvent modifier les vraies données Supabase.',
+        titlePrefix: '[LOCAL]',
+        background:
+          'linear-gradient(90deg, #1e3a8a, #1d4ed8)',
+        border: '#93c5fd',
+        text: '#eff6ff'
+      };
+    } else {
+      environment = {
+        key: 'unknown',
+        title:
+          'ENVIRONNEMENT NON IDENTIFIÉ',
+        message:
+          'Vérifie l’adresse avant toute modification.',
+        titlePrefix: '[ENVIRONNEMENT INCONNU]',
+        background:
+          'linear-gradient(90deg, #7f1d1d, #991b1b)',
+        border: '#fca5a5',
+        text: '#fef2f2'
+      };
+    }
+
+    const style =
+      document.createElement('style');
+
+    style.textContent = `
+      :root {
+        --tapcarta-environment-banner-height: 0px;
+      }
+
+      body.tapcarta-environment-banner-active {
+        padding-top:
+          var(--tapcarta-environment-banner-height);
+      }
+
+      body.tapcarta-environment-banner-active
+      main > header {
+        top:
+          var(--tapcarta-environment-banner-height)
+          !important;
+      }
+
+      #tapcarta-environment-banner {
+        position: fixed;
+        inset: 0 0 auto 0;
+        z-index: 9999;
+        width: 100%;
+        border-bottom-width: 2px;
+        border-bottom-style: solid;
+        box-shadow:
+          0 8px 24px rgba(0, 0, 0, 0.28);
+        font-family:
+          'DM Sans',
+          system-ui,
+          sans-serif;
+      }
+
+      .tapcarta-environment-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        width: 100%;
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 10px 18px;
+      }
+
+      .tapcarta-environment-title {
+        display: block;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.045em;
+      }
+
+      .tapcarta-environment-message {
+        display: block;
+        margin-top: 2px;
+        font-size: 11px;
+        line-height: 1.35;
+        opacity: 0.88;
+      }
+
+      .tapcarta-environment-meta {
+        flex: 0 0 auto;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        font-size: 10px;
+        white-space: nowrap;
+        background: rgba(0, 0, 0, 0.16);
+      }
+
+      @media (max-width: 760px) {
+        .tapcarta-environment-inner {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 7px;
+          padding: 9px 12px;
+        }
+
+        .tapcarta-environment-meta {
+          white-space: normal;
+          word-break: break-all;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    const banner =
+      document.createElement('div');
+
+    banner.id =
+      'tapcarta-environment-banner';
+
+    banner.dataset.environment =
+      environment.key;
+
+    banner.setAttribute(
+      'role',
+      'status'
+    );
+
+    banner.style.background =
+      environment.background;
+
+    banner.style.borderBottomColor =
+      environment.border;
+
+    banner.style.color =
+      environment.text;
+
+    banner.innerHTML = `
+      <div class="tapcarta-environment-inner">
+        <div>
+          <span class="tapcarta-environment-title">
+            ${escapeEnvironmentHtml(
+              environment.title
+            )}
+          </span>
+
+          <span class="tapcarta-environment-message">
+            ${escapeEnvironmentHtml(
+              environment.message
+            )}
+          </span>
+        </div>
+
+        <div class="tapcarta-environment-meta">
+          ${escapeEnvironmentHtml(
+            currentVersion
+          )}
+          ·
+          ${escapeEnvironmentHtml(
+            hostname || 'adresse locale'
+          )}
+        </div>
+      </div>
+    `;
+
+    document.body.prepend(banner);
+
+    document.body.classList.add(
+      'tapcarta-environment-banner-active'
+    );
+
+window.__tapCartaEnvironmentTitlePrefix =
+  environment.titlePrefix;
+
+document.title =
+  `${environment.titlePrefix} ` +
+  `TapCarta Admin — ${currentVersion}`;
+
+    const updateEnvironmentBannerHeight =
+      () => {
+        const height =
+          Math.ceil(
+            banner.getBoundingClientRect().height
+          );
+
+        document.documentElement.style.setProperty(
+          '--tapcarta-environment-banner-height',
+          `${height}px`
+        );
+      };
+
+    window.requestAnimationFrame(
+      updateEnvironmentBannerHeight
+    );
+
+    window.addEventListener(
+      'resize',
+      updateEnvironmentBannerHeight
+    );
+
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(
+        updateEnvironmentBannerHeight
+      ).observe(banner);
+    }
+  })();
+
+</script>
   <div class="min-h-screen bg-dark text-cream">
     <div class="grid min-h-screen lg:grid-cols-[280px_1fr]">
 
@@ -1153,7 +1451,10 @@ let editMode = false;
 let isDirty = false;
 let lastSavedSnapshot = null;
 let tapCartaPendingContractCount = 0;
-const TAPCARTA_ADMIN_BASE_TITLE = 'TapCarta Admin';
+const TAPCARTA_ADMIN_BASE_TITLE =
+  `${
+    window.__tapCartaEnvironmentTitlePrefix || ''
+  } TapCarta Admin — ${APP_VERSION}`.trim();
 let tapCartaLastKnownPendingCount = null;
 let tapCartaJoinRequestsRefreshTimer = null;
 let tapCartaKnownConfirmedRequests = new Set();
