@@ -8771,7 +8771,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   </script>
 
-    <script>
+   <script>
     (() => {
       if (window.__tapCartaPublicationsLoaded) return;
       window.__tapCartaPublicationsLoaded = true;
@@ -8800,7 +8800,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       ];
 
       const TAPCARTA_PUBLICATIONS_REFRESH_MS = 60000;
+      const TAPCARTA_COUNTDOWN_REFRESH_MS = 1000;
+
+      const ACTIVE_RELEASE_STATUSES = new Set([
+        'candidate',
+        'stabilizing',
+        'ready_for_deployment'
+      ]);
+
       let tapCartaPublicationsRefreshTimer = null;
+      let tapCartaPublicationsCountdownTimer = null;
+      let tapCartaCurrentReleasesByApp = new Map();
+      let tapCartaPublishingReleaseId = null;
 
       function escapeTapCartaPublicationHtml(value) {
         return String(value ?? '')
@@ -8811,53 +8822,528 @@ document.addEventListener('DOMContentLoaded', async () => {
           .replace(/'/g, '&#039;');
       }
 
+      function formatTapCartaPublicationDate(value) {
+        if (!value) return '—';
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+          return '—';
+        }
+
+        return new Intl.DateTimeFormat('fr-FR', {
+          dateStyle: 'short',
+          timeStyle: 'medium'
+        }).format(date);
+      }
+
+      function formatTapCartaPublicationCountdown(value) {
+        if (!value) return '—';
+
+        const targetTime = new Date(value).getTime();
+
+        if (Number.isNaN(targetTime)) {
+          return '—';
+        }
+
+        const remainingMilliseconds =
+          targetTime - Date.now();
+
+        if (remainingMilliseconds <= 0) {
+          return 'Délai terminé';
+        }
+
+        const remainingSeconds = Math.ceil(
+          remainingMilliseconds / 1000
+        );
+
+        const hours = Math.floor(
+          remainingSeconds / 3600
+        );
+
+        const minutes = Math.floor(
+          (remainingSeconds % 3600) / 60
+        );
+
+        const seconds =
+          remainingSeconds % 60;
+
+        return [
+          String(hours).padStart(2, '0'),
+          String(minutes).padStart(2, '0'),
+          String(seconds).padStart(2, '0')
+        ].join(':');
+      }
+
+      function getTapCartaPublicationStatusConfig(release) {
+        if (!release) {
+          return {
+            label: 'Aucune publication',
+            cardClass:
+              'border-white/10 bg-black/20',
+            badgeClass:
+              'border-white/10 bg-white/5 text-cream/50',
+            buttonClass:
+              'cursor-not-allowed border-white/10 bg-white/5 text-cream/35',
+            buttonLabel: 'Indisponible',
+            buttonDisabled: true
+          };
+        }
+
+        if (
+          tapCartaPublishingReleaseId === release.id
+        ) {
+          return {
+            label: 'Publication en cours',
+            cardClass:
+              'border-orange-400/60 bg-orange-500/10',
+            badgeClass:
+              'border-orange-400/40 bg-orange-500/15 text-orange-200',
+            buttonClass:
+              'cursor-wait border-orange-400/40 bg-orange-500/20 text-orange-100',
+            buttonLabel: 'Publication en cours…',
+            buttonDisabled: true
+          };
+        }
+
+        switch (release.release_status) {
+          case 'candidate':
+            return {
+              label: 'Candidate',
+              cardClass:
+                'border-orange-400/50 bg-orange-500/10',
+              badgeClass:
+                'border-orange-400/40 bg-orange-500/15 text-orange-200',
+              buttonClass:
+                'border-orange-300/70 bg-orange-500/20 text-orange-100 hover:bg-orange-500/30',
+              buttonLabel: 'Publier immédiatement',
+              buttonDisabled: false
+            };
+
+          case 'stabilizing':
+            return {
+              label: 'Délai en cours',
+              cardClass:
+                'border-orange-400/50 bg-orange-500/10',
+              badgeClass:
+                'border-orange-400/40 bg-orange-500/15 text-orange-200',
+              buttonClass:
+                'border-orange-300/70 bg-orange-500/20 text-orange-100 hover:bg-orange-500/30',
+              buttonLabel: 'Publier immédiatement',
+              buttonDisabled: false
+            };
+
+          case 'ready_for_deployment':
+            return {
+              label: 'Prête à publier',
+              cardClass:
+                'border-amber-300/60 bg-amber-400/10',
+              badgeClass:
+                'border-amber-300/40 bg-amber-400/15 text-amber-100',
+              buttonClass:
+                'border-amber-200/70 bg-amber-400/20 text-amber-50 hover:bg-amber-400/30',
+              buttonLabel: 'Publier maintenant',
+              buttonDisabled: false
+            };
+
+          case 'published':
+            return {
+              label: 'Publiée',
+              cardClass:
+                'border-emerald-400/55 bg-emerald-500/10',
+              badgeClass:
+                'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
+              buttonClass:
+                'cursor-not-allowed border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
+              buttonLabel: 'Publiée',
+              buttonDisabled: true
+            };
+
+          case 'blocked':
+            return {
+              label: 'Bloquée',
+              cardClass:
+                'border-red-400/60 bg-red-500/10',
+              badgeClass:
+                'border-red-400/40 bg-red-500/15 text-red-200',
+              buttonClass:
+                'cursor-not-allowed border-red-400/40 bg-red-500/15 text-red-200',
+              buttonLabel: 'Publication bloquée',
+              buttonDisabled: true
+            };
+
+          case 'refused':
+            return {
+              label: 'Refusée',
+              cardClass:
+                'border-red-400/60 bg-red-500/10',
+              badgeClass:
+                'border-red-400/40 bg-red-500/15 text-red-200',
+              buttonClass:
+                'cursor-not-allowed border-red-400/40 bg-red-500/15 text-red-200',
+              buttonLabel: 'Publication refusée',
+              buttonDisabled: true
+            };
+
+          case 'cancelled':
+            return {
+              label: 'Annulée',
+              cardClass:
+                'border-red-400/60 bg-red-500/10',
+              badgeClass:
+                'border-red-400/40 bg-red-500/15 text-red-200',
+              buttonClass:
+                'cursor-not-allowed border-red-400/40 bg-red-500/15 text-red-200',
+              buttonLabel: 'Publication annulée',
+              buttonDisabled: true
+            };
+
+          default:
+            return {
+              label:
+                release.release_status || 'Statut inconnu',
+              cardClass:
+                'border-white/10 bg-black/20',
+              badgeClass:
+                'border-white/10 bg-white/5 text-cream/50',
+              buttonClass:
+                'cursor-not-allowed border-white/10 bg-white/5 text-cream/35',
+              buttonLabel: 'Indisponible',
+              buttonDisabled: true
+            };
+        }
+      }
+
       function renderTapCartaPublications(releasesByApp) {
         const list =
           document.getElementById('publications-list');
 
         if (!list) return;
 
-        list.innerHTML = TAPCARTA_RELEASE_APPS.map((app) => {
-          const release = releasesByApp.get(app.appKey);
-          const version = release?.version || '—';
-          const releaseId = release?.id || '—';
+        tapCartaCurrentReleasesByApp =
+          releasesByApp;
 
-          return `
-            <article class="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div class="text-sm font-bold text-gold">
-                ${escapeTapCartaPublicationHtml(app.label)}
-              </div>
+        list.innerHTML = TAPCARTA_RELEASE_APPS.map(
+          (app) => {
+            const release =
+              releasesByApp.get(app.appKey);
 
-              <div class="mt-4 space-y-3">
-                <div>
-                  <div class="text-[10px] uppercase tracking-wide text-cream/40">
-                    V
+            const statusConfig =
+              getTapCartaPublicationStatusConfig(
+                release
+              );
+
+            const version =
+              release?.version || '—';
+
+            const releaseId =
+              release?.id || '—';
+
+            const commitSha =
+              release?.release_commit_sha || '—';
+
+            const shortCommitSha =
+              commitSha !== '—'
+                ? commitSha.slice(0, 12)
+                : '—';
+
+            const releaseStatus =
+              release?.release_status || '';
+
+            const isActive =
+              ACTIVE_RELEASE_STATUSES.has(
+                releaseStatus
+              );
+
+            const countdown =
+              release?.stabilization_ends_at
+                ? formatTapCartaPublicationCountdown(
+                    release.stabilization_ends_at
+                  )
+                : '—';
+
+            const buttonDisabled =
+              statusConfig.buttonDisabled ||
+              !release?.id;
+
+            const decisionReason =
+              release?.decision_reason || '';
+
+            return `
+              <article
+                class="rounded-2xl border p-4 transition ${statusConfig.cardClass}"
+                data-publication-app="${escapeTapCartaPublicationHtml(app.appKey)}"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-bold text-gold">
+                      ${escapeTapCartaPublicationHtml(app.label)}
+                    </div>
+
+                    <div class="mt-1 font-mono text-[10px] text-cream/35">
+                      ${escapeTapCartaPublicationHtml(app.appKey)}
+                    </div>
                   </div>
-                  <div class="mt-1 text-sm font-semibold text-cream">
-                    ${escapeTapCartaPublicationHtml(version)}
+
+                  <div
+                    class="rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${statusConfig.badgeClass}"
+                  >
+                    ${escapeTapCartaPublicationHtml(statusConfig.label)}
                   </div>
                 </div>
 
-                <div>
-                  <div class="text-[10px] uppercase tracking-wide text-cream/40">
-                    UUID
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      Version visuelle
+                    </div>
+                    <div class="mt-1 text-sm font-semibold text-cream">
+                      ${escapeTapCartaPublicationHtml(version)}
+                    </div>
                   </div>
-                  <div class="mt-1 break-all font-mono text-xs text-cream/75">
-                    ${escapeTapCartaPublicationHtml(releaseId)}
+
+                  <div>
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      Commit GitHub
+                    </div>
+                    <div
+                      class="mt-1 break-all font-mono text-xs text-cream/75"
+                      title="${escapeTapCartaPublicationHtml(commitSha)}"
+                    >
+                      ${escapeTapCartaPublicationHtml(shortCommitSha)}
+                    </div>
+                  </div>
+
+                  <div class="sm:col-span-2">
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      UUID de publication
+                    </div>
+                    <div class="mt-1 break-all font-mono text-xs text-cream/75">
+                      ${escapeTapCartaPublicationHtml(releaseId)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      Détectée le
+                    </div>
+                    <div class="mt-1 text-xs text-cream/75">
+                      ${escapeTapCartaPublicationHtml(
+                        formatTapCartaPublicationDate(
+                          release?.created_at
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      Publication automatique
+                    </div>
+                    <div class="mt-1 text-xs text-cream/75">
+                      ${escapeTapCartaPublicationHtml(
+                        formatTapCartaPublicationDate(
+                          release?.stabilization_ends_at
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      Compte à rebours
+                    </div>
+                    <div
+                      class="mt-1 font-mono text-sm font-bold ${
+                        isActive
+                          ? 'text-orange-200'
+                          : 'text-cream/60'
+                      }"
+                      data-publication-countdown-id="${escapeTapCartaPublicationHtml(releaseId)}"
+                      data-publication-countdown-end="${escapeTapCartaPublicationHtml(
+                        release?.stabilization_ends_at || ''
+                      )}"
+                    >
+                      ${escapeTapCartaPublicationHtml(countdown)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                      Publiée le
+                    </div>
+                    <div class="mt-1 text-xs text-cream/75">
+                      ${escapeTapCartaPublicationHtml(
+                        formatTapCartaPublicationDate(
+                          release?.published_at
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          `;
-        }).join('');
+
+                ${
+                  decisionReason
+                    ? `
+                      <div class="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+                        <div class="text-[10px] uppercase tracking-wide text-cream/40">
+                          Décision
+                        </div>
+                        <div class="mt-1 text-xs text-cream/70">
+                          ${escapeTapCartaPublicationHtml(decisionReason)}
+                        </div>
+                      </div>
+                    `
+                    : ''
+                }
+
+                <button
+                  type="button"
+                  class="mt-4 w-full rounded-xl border px-4 py-3 text-sm font-bold transition ${statusConfig.buttonClass}"
+                  data-action="publish-release-immediately"
+                  data-release-id="${escapeTapCartaPublicationHtml(release?.id || '')}"
+                  data-app-key="${escapeTapCartaPublicationHtml(app.appKey)}"
+                  ${buttonDisabled ? 'disabled' : ''}
+                >
+                  ${escapeTapCartaPublicationHtml(statusConfig.buttonLabel)}
+                </button>
+              </article>
+            `;
+          }
+        ).join('');
+      }
+
+      function updateTapCartaPublicationCountdowns() {
+        const countdownElements =
+          document.querySelectorAll(
+            '[data-publication-countdown-end]'
+          );
+
+        for (const element of countdownElements) {
+          const end =
+            element.dataset.publicationCountdownEnd;
+
+          element.textContent =
+            formatTapCartaPublicationCountdown(end);
+        }
+      }
+
+      async function publishTapCartaReleaseImmediately(
+        releaseId,
+        appKey
+      ) {
+        if (!releaseId) return;
+
+        const release =
+          tapCartaCurrentReleasesByApp.get(appKey);
+
+        if (!release) return;
+
+        if (
+          !ACTIVE_RELEASE_STATUSES.has(
+            release.release_status
+          )
+        ) {
+          window.alert(
+            'Cette publication ne peut pas être publiée immédiatement dans son état actuel.'
+          );
+          return;
+        }
+
+        const confirmed = window.confirm(
+          `Publier immédiatement ${appKey} ?\n\n` +
+          `Version : ${release.version || '—'}\n` +
+          `UUID : ${release.id}\n` +
+          `Commit : ${release.release_commit_sha || '—'}\n\n` +
+          `Cette action promouvra sur Vercel le déploiement correspondant exactement à ce commit GitHub.`
+        );
+
+        if (!confirmed) return;
+
+        tapCartaPublishingReleaseId =
+          releaseId;
+
+        renderTapCartaPublications(
+          tapCartaCurrentReleasesByApp
+        );
+
+        const status =
+          document.getElementById(
+            'publications-status'
+          );
+
+        if (status) {
+          status.textContent =
+            'Publication immédiate en cours…';
+        }
+
+        try {
+          const { data, error } =
+            await tapCartaSupabase.functions.invoke(
+              'publish-release',
+              {
+                body: {
+                  release_id: releaseId
+                }
+              }
+            );
+
+          if (error) {
+            throw error;
+          }
+
+          if (
+            data?.error ||
+            data?.success === false
+          ) {
+            throw new Error(
+              data?.message ||
+              data?.error ||
+              'La publication a échoué.'
+            );
+          }
+
+          if (status) {
+            status.textContent =
+              'Publication effectuée avec succès.';
+          }
+
+          await loadTapCartaPublications();
+        } catch (error) {
+          console.error(
+            'Publication immédiate impossible :',
+            error
+          );
+
+          if (status) {
+            status.textContent =
+              'La publication immédiate a échoué.';
+          }
+
+          window.alert(
+            error?.message ||
+            'La publication immédiate a échoué.'
+          );
+        } finally {
+          tapCartaPublishingReleaseId =
+            null;
+
+          renderTapCartaPublications(
+            tapCartaCurrentReleasesByApp
+          );
+        }
       }
 
       async function loadTapCartaPublications() {
         const status =
-          document.getElementById('publications-status');
+          document.getElementById(
+            'publications-status'
+          );
 
         const list =
-          document.getElementById('publications-list');
+          document.getElementById(
+            'publications-list'
+          );
 
         if (!status || !list) return;
 
@@ -8868,26 +9354,48 @@ document.addEventListener('DOMContentLoaded', async () => {
           status.textContent =
             'Connecte-toi pour afficher les publications.';
 
-          renderTapCartaPublications(new Map());
+          renderTapCartaPublications(
+            new Map()
+          );
           return;
         }
 
-        status.textContent = 'Chargement...';
+        status.textContent =
+          'Chargement…';
 
         const appKeys =
-          TAPCARTA_RELEASE_APPS.map((app) => app.appKey);
+          TAPCARTA_RELEASE_APPS.map(
+            (app) => app.appKey
+          );
 
-        const { data, error } = await tapCartaSupabase
-          .from('app_release_versions')
-          .select(`
-            id,
-            app_key,
-            version,
-            created_at
-          `)
-          .in('app_key', appKeys)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false });
+        const { data, error } =
+          await tapCartaSupabase
+            .from('app_release_versions')
+            .select(`
+              id,
+              app_key,
+              version,
+              release_status,
+              created_at,
+              published_at,
+              release_commit_sha,
+              stabilization_started_at,
+              stabilization_ends_at,
+              stabilization_completed_at,
+              decision_at,
+              decision_reason,
+              vercel_deployment_id,
+              vercel_deployment_url
+            `)
+            .in('app_key', appKeys)
+            .order(
+              'created_at',
+              { ascending: false }
+            )
+            .order(
+              'id',
+              { ascending: false }
+            );
 
         if (error) {
           console.error(
@@ -8898,16 +9406,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           status.textContent =
             'Lecture des publications indisponible.';
 
-          renderTapCartaPublications(new Map());
+          renderTapCartaPublications(
+            new Map()
+          );
           return;
         }
 
-        const releasesByApp = new Map();
+        const releasesByApp =
+          new Map();
 
         for (const release of data || []) {
           if (
             release?.app_key &&
-            !releasesByApp.has(release.app_key)
+            !releasesByApp.has(
+              release.app_key
+            )
           ) {
             releasesByApp.set(
               release.app_key,
@@ -8916,34 +9429,76 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }
 
-        renderTapCartaPublications(releasesByApp);
+        renderTapCartaPublications(
+          releasesByApp
+        );
+
         status.textContent = '';
+      }
+
+      function handleTapCartaPublicationClick(
+        event
+      ) {
+        const button =
+          event.target.closest(
+            '[data-action="publish-release-immediately"]'
+          );
+
+        if (!button || button.disabled) {
+          return;
+        }
+
+        publishTapCartaReleaseImmediately(
+          button.dataset.releaseId,
+          button.dataset.appKey
+        );
       }
 
       function initializeTapCartaPublications() {
         const navButton =
-          document.getElementById('nav-publications-btn');
+          document.getElementById(
+            'nav-publications-btn'
+          );
 
         const reloadButton =
-          document.getElementById('reload-publications-btn');
+          document.getElementById(
+            'reload-publications-btn'
+          );
+
+        const list =
+          document.getElementById(
+            'publications-list'
+          );
 
         if (navButton) {
-          navButton.addEventListener('click', async () => {
-            await loadTapCartaPublications();
+          navButton.addEventListener(
+            'click',
+            async () => {
+              await loadTapCartaPublications();
 
-            document
-              .getElementById('publications-section')
-              ?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-              });
-          });
+              document
+                .getElementById(
+                  'publications-section'
+                )
+                ?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start'
+                });
+            }
+          );
         }
 
         if (reloadButton) {
           reloadButton.addEventListener(
             'click',
             loadTapCartaPublications
+          );
+        }
+
+        if (list) {
+          list.addEventListener(
+            'click',
+            handleTapCartaPublicationClick
           );
         }
 
@@ -8955,15 +9510,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             TAPCARTA_PUBLICATIONS_REFRESH_MS
           );
 
-        tapCartaSupabase.auth.onAuthStateChange(() => {
-          window.setTimeout(
-            loadTapCartaPublications,
-            0
+        tapCartaPublicationsCountdownTimer =
+          window.setInterval(
+            updateTapCartaPublicationCountdowns,
+            TAPCARTA_COUNTDOWN_REFRESH_MS
           );
-        });
+
+        tapCartaSupabase.auth.onAuthStateChange(
+          () => {
+            window.setTimeout(
+              loadTapCartaPublications,
+              0
+            );
+          }
+        );
       }
 
-      if (document.readyState === 'loading') {
+      if (
+        document.readyState === 'loading'
+      ) {
         document.addEventListener(
           'DOMContentLoaded',
           initializeTapCartaPublications,
